@@ -238,6 +238,9 @@ function Issue() {
     load();
   }, []);
   const batch = batches.find((b) => b.id === pick);
+  useEffect(() => {
+    if (batch) setN(String(Math.min(24, batch.quantity - batch.issued)));
+  }, [pick, batches.length]);
   const issue = () =>
     run(async () => {
       if (!batch) throw new Error("Pick a batch");

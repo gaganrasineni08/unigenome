@@ -553,7 +553,7 @@ app.post("/verify", async (c) => {
   if (!b.device) bad("Missing device id");
   const r = await verifyScan(String(b.text ?? ""), { device: String(b.device), lat: b.lat ?? null, lng: b.lng ?? null, record: true });
   const view = r.row ? await unitView(r.row.id) : null;
-  return c.json({ verdict: r.verdict, checks: r.checks, reasons: r.reasons, unit: r.unit, view });
+  return c.json({ verdict: r.verdict, checks: r.checks, reasons: r.reasons, unit: r.unit, view: r.verdict === "COUNTERFEIT" ? null : view });
 });
 
 app.post("/claim", async (c) => {
@@ -688,9 +688,9 @@ app.post("/demo/seed", async (c) => {
 app.get("/dsa/overview", async (c) => {
   const ix = await indexes();
   const d = await db();
-  const cartons = await d.query("SELECT id FROM units WHERE kind = 'carton' ORDER BY created_at DESC LIMIT 20");
+  const cartons = await d.query("SELECT u.id FROM units u JOIN pack_links l ON l.parent = u.id WHERE u.kind = 'carton' GROUP BY u.id ORDER BY count(*) DESC, u.id LIMIT 20");
   const units = await d.query("SELECT id, kind FROM units WHERE kind <> 'item' ORDER BY created_at DESC LIMIT 1");
-  const anyItem = await d.query("SELECT id FROM units WHERE kind = 'item' ORDER BY created_at DESC LIMIT 1");
+  const anyItem = await d.query("SELECT e.unit AS id FROM events e JOIN units u ON u.id = e.unit WHERE u.kind = 'item' GROUP BY e.unit ORDER BY count(*) DESC, e.unit LIMIT 1");
   const batches = await d.query("SELECT id FROM batches ORDER BY created_at DESC");
   const { ordered, array } = await alertHeap();
   const { g, rows } = await routeGraph();

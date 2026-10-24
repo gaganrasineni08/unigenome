@@ -37,6 +37,11 @@ export default function DsaPage() {
   useEffect(() => {
     history.replaceState(null, "", "#" + tab);
   }, [tab]);
+  useEffect(() => {
+    const on = () => setTab(location.hash.slice(1) || "hash");
+    addEventListener("hashchange", on);
+    return () => removeEventListener("hashchange", on);
+  }, []);
   return (
     <>
       <TopBar title="DSA, live" color="#4fc3f7" />
@@ -306,7 +311,7 @@ function HeapDemo({ o }: { o: any }) {
       <H2>Alerts priority queue (binary max-heap by severity, then age)</H2>
       {a.length === 0 ? <p className="text-mute">No open alerts.</p> : (
         <>
-          <svg viewBox="0 0 760 260" className="w-full">{draw(0, 380, 30, 180)}</svg>
+          <svg viewBox={`0 0 760 ${Math.floor(Math.log2(a.length)) * 60 + 70}`} className="w-full">{draw(0, 380, 30, 180)}</svg>
           <div className="mt-2 flex flex-wrap gap-1">{a.map((x: any, i: number) => <span key={i} className="rounded border border-line px-2 py-0.5 text-xs"><span className="text-mute">[{i}]</span> {x.severity}</span>)}</div>
           <p className="mt-3 text-sm text-mute">Stored as an array: index i has children 2i+1 and 2i+2. Each parent is at least as urgent as its children, so the top is always the next alert to handle. Popping order: {o.heap.ordered.map((x: any) => x.severity).join(", ")}.</p>
         </>

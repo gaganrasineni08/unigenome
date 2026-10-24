@@ -151,6 +151,12 @@ function Result({ res, offline }: { res: any; where?: unknown; offline: any }) {
       <VerdictHero verdict={res.verdict} />
       {res.reasons?.length > 0 && <Alert tone={res.verdict === "SUSPICIOUS_CLONE" ? "amber" : "coral"}>Why: {res.reasons.join("; ")}.</Alert>}
 
+      {res.verdict === "COUNTERFEIT" && f && (
+        <Alert>
+          This code claims to be <b className="mono">{f.id}</b>{f.product ? <> ({f.product})</> : null}, but those details are not what the manufacturer signed and registered. Do not use the product. Please raise a complaint below so the regulator can trace where it was sold.
+        </Alert>
+      )}
+
       {v?.batch && (
         <Card>
           <div className="flex flex-wrap items-start justify-between gap-3">

@@ -301,9 +301,11 @@ export async function verifyScan(text: string, ctx: { device: string; lat?: numb
     }
     const last = ix.lastSeen.get(row.id);
     if (here && last) {
+      const km = haversineKm(last, here);
       const speed = impliedSpeedKmh(last, here);
-      const ok = speed <= MAX_SPEED_KMH;
-      checks.push({ tier: "T1", ok, label: "Travel since last scan is physically possible", detail: `${Math.round(haversineKm(last, here))} km, ${Number.isFinite(speed) ? Math.round(speed) + " km/h" : "no time between scans"}` });
+      // Under 5 km is GPS noise or the same neighbourhood, whatever the time gap.
+      const ok = km < 5 || speed <= MAX_SPEED_KMH;
+      checks.push({ tier: "T1", ok, label: "Travel since last scan is physically possible", detail: km < 5 ? "same area as the last scan" : `${Math.round(km)} km, ${Number.isFinite(speed) ? Math.round(speed) + " km/h" : "no time between scans"}` });
       if (!ok) {
         clone = true;
         reasons.push("scanned too far from its last scan in too little time");

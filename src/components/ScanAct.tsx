@@ -76,7 +76,7 @@ export function ScanAct({ allowed }: { allowed: Action[] }) {
         if (form.note) data.note = form.note;
       }
       const r = await record(me, secretKey, unit.id, unit.head, action!, data, w);
-      setResult({ ...r, action });
+      setResult({ ...r, action, released: action === "UNPACKED" ? unit.contents?.count : undefined });
       if (r.spotCheck) setSpot(Object.fromEntries(r.spotCheck.map((s: any) => [s.id, "pending"])));
       setAction(null);
       await reload();
@@ -119,7 +119,7 @@ export function ScanAct({ allowed }: { allowed: Action[] }) {
                   <div className="flex h-12 w-12 items-center justify-center rounded-full bg-mint/20 text-2xl text-mint">✓</div>
                   <div>
                     <div className="font-display text-xl font-semibold">{EVENT_LABEL[result.action]} · signed and saved</div>
-                    {result.kind !== "item" && <div className="text-mint">{result.itemsInside} items updated by this one scan</div>}
+                    {result.action === "UNPACKED" ? <div className="text-mint">{result.released} items taken out; each one now has its own record</div> : result.kind !== "item" && <div className="text-mint">{result.itemsInside} items updated by this one scan</div>}
                   </div>
                 </div>
                 {result.eta && (
@@ -182,13 +182,14 @@ export function ScanAct({ allowed }: { allowed: Action[] }) {
                 ))}
               </div>
             )}
-            {!options.length && !unit.inTransitTo && unit.top === unit.id && unit.custodian !== me.id && (
+            {!options.length && unit.kind !== "item" && unit.contents?.count === 0 && <p className="mt-4 text-sm text-mute">This box has been opened and is empty.</p>}
+            {!options.length && !unit.inTransitTo && unit.top === unit.id && unit.custodian !== me.id && !(unit.kind !== "item" && unit.contents?.count === 0) && (
               <p className="mt-4 text-sm text-mute">You don't hold this unit, so there's nothing to record.</p>
             )}
 
             {action && (
               <div className="mt-4 space-y-3 rounded-xl border border-line bg-abyss/50 p-4">
-                <div className="font-semibold">{EVENT_LABEL[action]}</div>
+                <div className="font-semibold">{options.find((o) => o.a === action)?.label ?? EVENT_LABEL[action]}</div>
                 {action === "DISPATCHED" && (
                   <>
                     <Field label="Destination">
