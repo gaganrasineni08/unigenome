@@ -88,7 +88,7 @@ export default function Home() {
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-abyss/70 via-abyss/10 to-transparent" />
       </div>
 
-      <header className="fixed inset-x-0 top-0 z-30">
+      <header className="fixed inset-x-0 top-0 z-30 bg-abyss/60 backdrop-blur-md">
         <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-4">
           <img src="/icon.svg" className="h-9 w-9" alt="" />
           <span className="font-display text-xl font-semibold">UniGenome</span>

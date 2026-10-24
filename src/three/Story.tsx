@@ -24,7 +24,7 @@ const smooth = (t: number) => t * t * (3 - 2 * t);
 const clamp = (x: number, a = 0, b = 1) => Math.min(b, Math.max(a, x));
 
 function CameraRig({ progress }: { progress: P }) {
-  const { camera } = useThree();
+  const { camera, size } = useThree();
   const look = useRef(new THREE.Vector3(...KEYS[0][1]));
   const pos = new THREE.Vector3();
   const tgt = new THREE.Vector3();
@@ -34,6 +34,9 @@ function CameraRig({ progress }: { progress: P }) {
     const t = smooth(f - i);
     pos.fromArray(KEYS[i][0]).lerp(tgt.fromArray(KEYS[i + 1][0]), t);
     const l = new THREE.Vector3().fromArray(KEYS[i][1]).lerp(tgt.fromArray(KEYS[i + 1][1]), t);
+    // Portrait screens see less width, so pull the camera back along its view line.
+    const aspect = size.width / size.height;
+    if (aspect < 1.2) pos.sub(l).multiplyScalar(Math.min(2.2, 1.2 / aspect)).add(l);
     const k = 1 - Math.exp(-dt * 4);
     camera.position.lerp(pos, k);
     look.current.lerp(l, k);
