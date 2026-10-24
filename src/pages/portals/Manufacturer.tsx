@@ -1,3 +1,4 @@
+import { labelStore } from "../../lib/labels";
 import { useEffect, useMemo, useState } from "react";
 import { Link, Route, Routes } from "react-router-dom";
 import { randomBytes, toHex } from "../../../shared/bytes";
@@ -20,22 +21,7 @@ import { Complaints } from "./Complaints";
 
 const COLOR = "#02C39A";
 
-export const labelStore = {
-  get(batch: string): Record<string, string> {
-    try {
-      return JSON.parse(localStorage.getItem("ug.labels." + batch) ?? "{}");
-    } catch {
-      return {};
-    }
-  },
-  add(batch: string, codes: Record<string, string>) {
-    try {
-      localStorage.setItem("ug.labels." + batch, JSON.stringify({ ...labelStore.get(batch), ...codes }));
-    } catch {
-      /* storage full or blocked: the codes are still shown on screen once */
-    }
-  },
-};
+export { labelStore };
 
 export default function ManufacturerPortal() {
   return (
@@ -259,7 +245,7 @@ function Issue() {
       if (!(count > 0)) throw new Error("Nothing left to issue in this batch");
       const where = await locate(me!);
       const codes: Record<string, string> = {};
-      const items = [];
+      const items: any[] = [];
       for (let i = 1; i <= count; i++) {
         const num = batch.issued + i;
         const f: ItemFields = { kind: "item", id: `${batch.id}-${String(num).padStart(3, "0")}`, batch: batch.id, mfr: me!.id, product: batch.product_code, mfg: batch.mfg, salt: toHex(randomBytes(8)) };

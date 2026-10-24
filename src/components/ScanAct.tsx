@@ -49,14 +49,14 @@ export function ScanAct({ allowed }: { allowed: Action[] }) {
   const mine = unit && unit.custodian === me.id && unit.top === unit.id;
   const incoming = unit && unit.inTransitTo && unit.top === unit.id;
   const options: Array<{ a: Action; label: string; show: boolean }> = unit
-    ? [
+    ? ([
         { a: "RECEIVED", label: "Receive", show: !!incoming },
         { a: "DISPATCHED", label: "Dispatch", show: !!mine },
         { a: "STORED", label: "Store", show: !!mine },
         { a: "CONDITION", label: "Condition check", show: !!mine },
         { a: "UNPACKED", label: unit.kind === "pallet" ? "Unpack pallet" : "Open carton", show: !!mine && unit.kind !== "item" },
         { a: "SOLD", label: "Mark sold", show: !!mine && unit.kind === "item" && !unit.sold },
-      ].filter((o) => o.show && allowed.includes(o.a))
+      ] as Array<{ a: Action; label: string; show: boolean }>).filter((o) => o.show && allowed.includes(o.a))
     : [];
 
   const submit = () =>

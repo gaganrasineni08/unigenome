@@ -127,7 +127,7 @@ async function run() {
     await call("POST", "/batches", { body, sig: signMessage("UG/batch", body, M.sk) }, M.token);
     const b = (await d.query("SELECT sig FROM batches WHERE id = $1", [id]))[0];
     await call("POST", `/batches/${id}/approve`, { sig: signMessage("UG/batch-qa", { batch: id, sig: b.sig }, A.sunqa.sk) }, A.sunqa.token);
-    const items = [];
+    const items: any[] = [];
     for (let i = 1; i <= qty; i++) {
       const f: ItemFields = { kind: "item", id: `${id}-${String(i).padStart(3, "0")}`, batch: id, mfr: M.id, product: code, mfg, exp, salt: toHex(randomBytes(8)) };
       const claim = toHex(randomBytes(4)).toUpperCase();
@@ -153,7 +153,7 @@ async function run() {
   // ---- route history so arrival estimates have real data (topic 8)
   const W1 = A.hydwarehouse, W2 = A.mumwarehouse, R1 = A.apollo, R2 = A.medplus, R3 = A.andheri;
   const hist = await makeBatch("B-0950", "ORS-200", "Oral Rehydration Salts 200 ml", "2026-09-20", "2027-09-19", 12, t0);
-  const hc = [];
+  const hc: string[] = [];
   for (let i = 0; i < 6; i++) hc.push(await pack(M, "carton", hist.slice(i * 2, i * 2 + 2), t0 + HOUR + i * 1000));
   await ship(M, W1, hc[0], t0 + 2 * HOUR, 22);
   await ship(M, W1, hc[1], t0 + 3 * HOUR, 26);

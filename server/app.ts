@@ -677,6 +677,14 @@ app.get("/expiring", async (c) => {
 
 // ------------------------------------------------------------------ DSA page: live snapshots
 
+// Load the demo data set (used by the "Load demo data" button on the home page).
+app.post("/demo/seed", async (c) => {
+  if (process.env.ALLOW_DEMO_SEED === "0") bad("Demo loading is turned off on this server", 403);
+  const body = await c.req.json().catch(() => ({}));
+  const { seedDemo } = await import("./seed");
+  return c.json(await seedDemo({ reset: !!body.reset }));
+});
+
 app.get("/dsa/overview", async (c) => {
   const ix = await indexes();
   const d = await db();
@@ -743,6 +751,8 @@ app.get("/dsa/chain/:id", async (c) => {
   const test = t != null ? chain.map((r, i) => (i === Number(t) ? { ...r, body: { ...r.body, ts: r.body.ts + 3600_000 } } : r)) : chain;
   return c.json({ records: test.map((r) => ({ type: r.body.type, actor: ix.parties.get(r.body.actor)?.name, ts: r.body.ts, prev: r.body.prev, hash: r.hash })), check: verifyChain(test, (pid) => ix.parties.get(pid)?.publicKey) });
 });
+
+app.get("/dsa/recall/:batch", async (c) => c.json(await recallAnalysis(c.req.param("batch"), Number(c.req.query("budget") ?? 10), Number(c.req.query("staff") ?? 3))));
 
 app.get("/dsa/hash", (c) => {
   const text = c.req.query("text") ?? "";
