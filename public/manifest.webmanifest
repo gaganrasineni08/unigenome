@@ -1,0 +1,9 @@
+{
+  "name": "UniGenome",
+  "short_name": "UniGenome",
+  "start_url": "/buyer",
+  "display": "standalone",
+  "background_color": "#011f22",
+  "theme_color": "#011f22",
+  "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}

@@ -1,0 +1,45 @@
+@import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
+
+@theme {
+  --color-ink: #e7f4f2;
+  --color-mute: #8fb3ae;
+  --color-deep: #011f22;
+  --color-abyss: #01161a;
+  --color-panel: #062c30;
+  --color-line: #12474c;
+  --color-teal: #028090;
+  --color-sea: #00a896;
+  --color-mint: #02c39a;
+  --color-amber: #e8a33d;
+  --color-coral: #d96c6c;
+  --color-violet: #8e7cc3;
+  --font-display: "Fraunces", Georgia, serif;
+  --font-sans: "Inter", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+}
+
+html, body, #root { min-height: 100%; }
+body {
+  margin: 0;
+  background: radial-gradient(1200px 600px at 80% -10%, #034349 0%, transparent 60%), radial-gradient(900px 500px at -10% 110%, #023a3b 0%, transparent 55%), var(--color-deep);
+  background-attachment: fixed;
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+.glass {
+  background: linear-gradient(180deg, rgba(10, 60, 64, 0.72), rgba(4, 36, 40, 0.72));
+  border: 1px solid rgba(2, 195, 154, 0.16);
+  box-shadow: 0 10px 40px -12px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(14px);
+}
+.mono { font-family: var(--font-mono); }
+.leaflet-container { background: #0b2b2e; border-radius: 16px; }
+.leaflet-tile { filter: saturate(0.6) brightness(0.85) hue-rotate(150deg) invert(0.92) contrast(0.9); }
+input, select, textarea { color-scheme: dark; }
+@media print {
+  body { background: #fff !important; color: #000 !important; }
+  .no-print { display: none !important; }
+  .print-sheet { display: block !important; }
+}
