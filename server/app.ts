@@ -352,6 +352,17 @@ authed.post("/containers", async (c) => {
   return c.json({ id: f.id, payload: encodePayload(unit) });
 });
 
+/** Printable labels: every item of a batch, or every container this party packed. */
+authed.get("/labels", async (c) => {
+  const me = c.get("party");
+  const d = await db();
+  const batch = c.req.query("batch");
+  const rows = batch
+    ? await d.query("SELECT id, kind, fields, sig, parent_id FROM units WHERE batch_id = $1 AND signer = $2 ORDER BY id", [batch, me.id])
+    : await d.query("SELECT id, kind, fields, sig, parent_id, (SELECT COUNT(*) FROM pack_links l WHERE l.parent = u.id) AS n FROM units u WHERE kind <> 'item' AND signer = $1 ORDER BY created_at DESC", [me.id]);
+  return c.json(rows.map((r) => ({ id: r.id, kind: r.kind, parent: r.parent_id, count: r.n != null ? Number(r.n) : undefined, payload: encodePayload({ f: r.fields, sig: r.sig }) })));
+});
+
 // ------------------------------------------------------------------ scanning: one endpoint for every custody record
 
 authed.post("/events", async (c) => {

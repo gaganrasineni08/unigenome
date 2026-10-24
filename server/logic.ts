@@ -350,7 +350,7 @@ export async function verifyScan(text: string, ctx: { device: string; lat?: numb
   return { verdict, checks, reasons, unit, row, batch };
 }
 
-export const hashClaim = (unitId: string, code: string) => sha256Hex("claim:" + unitId + ":" + code.trim().toUpperCase());
+export const hashClaim = (unitId: string, code: string) => sha256Hex("claim:" + unitId + ":" + code.replace(/[^0-9a-z]/gi, "").toUpperCase());
 
 // ---------------------------------------------------------------- recall (topics 7 and 10)
 
