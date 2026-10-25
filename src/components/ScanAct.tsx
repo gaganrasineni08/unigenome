@@ -56,7 +56,7 @@ export function ScanAct({ allowed }: { allowed: Action[] }) {
 
   if (!me || !secretKey) return null;
   const mine = unit && unit.custodian === me.id && unit.top === unit.id;
-  const incoming = unit && unit.inTransitTo && unit.top === unit.id;
+  const incoming = unit && unit.inTransitTo === me.id && unit.top === unit.id;
   const options: Array<{ a: Action; label: string; show: boolean }> = unit
     ? ([
         { a: "RECEIVED", label: "Receive", show: !!incoming },
@@ -163,7 +163,14 @@ export function ScanAct({ allowed }: { allowed: Action[] }) {
           )}
         </AnimatePresence>
 
-        {unit && (
+        {unit?.restricted && (
+          <Card>
+            <div className="text-xs font-semibold uppercase tracking-wider text-mute">{unit.kind}</div>
+            <div className="mono text-2xl">{unit.id}</div>
+            <Alert tone="amber">This belongs to another company's shipment. Only the sender and the company it was sent to can see its details or receive it.</Alert>
+          </Card>
+        )}
+        {unit && !unit.restricted && (
           <Card>
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
@@ -227,7 +234,6 @@ export function ScanAct({ allowed }: { allowed: Action[] }) {
                   </>
                 )}
                 {action === "UNPACKED" && <p className="text-sm text-mute">The {unit.contents.direct} units inside become separate. The server will pick some at random for you to spot-check.</p>}
-                {action === "RECEIVED" && unit.inTransitTo !== me.id && <Alert tone="amber">This was sent to {unit.inTransitToName}, not you. Receiving it raises a diversion alert.</Alert>}
                 {act.error && <Alert>{act.error}</Alert>}
                 <div className="flex gap-2">
                   <Button busy={act.busy} onClick={submit}>Sign and record</Button>

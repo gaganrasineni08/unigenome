@@ -494,7 +494,12 @@ authed.post("/events", async (c) => {
       if (!isTop) bad(`${unit.id} is packed inside ${top.id}. Scan ${top.id} instead.`);
       if (!inTransitTo) bad("This unit is not in transit");
       const ship = (await d.query("SELECT * FROM shipments WHERE unit_id = $1 AND status = 'in_transit' ORDER BY dispatched_ts DESC LIMIT 1", [unit.id]))[0];
-      const diverted = inTransitTo !== me.id;
+      // Only the company the shipment was addressed to may receive it. Anyone else is refused, and the attempt is reported.
+      if (inTransitTo !== me.id) {
+        await raiseAlert({ kind: "diverted", severity: 4, unit: unit.id, party: me.id, message: `${me.name} tried to receive ${unit.id}, which was sent to ${ix.parties.get(inTransitTo!)?.name}` });
+        bad(`This shipment was sent to another company. Only they can receive it.`, 403);
+      }
+      const diverted = false;
       await d.tx(async (q) => {
         await appendEvent(q, body, sig, diverted ? [...flags, `expected at ${ix.parties.get(inTransitTo!)?.name}`] : flags);
         await q("UPDATE units SET custodian = $1, in_transit_to = NULL WHERE id = $2", [me.id, unit.id]);
@@ -624,7 +629,19 @@ async function unitView(id: string) {
   };
 }
 
-authed.get("/units/:id", async (c) => c.json(await unitView(c.req.param("id"))));
+/**
+ * Staff view of a unit. A company sees a unit only if it is involved: it holds it, it is the destination of
+ * the shipment, or it appears in the unit's history. Other companies (and the regulator sees everything) get
+ * nothing beyond the id, so a shipment is visible only to its sender and its chosen destination.
+ */
+authed.get("/units/:id", async (c) => {
+  const me = c.get("party");
+  const v = await unitView(c.req.param("id"));
+  const org = me.role === "qa" ? me.org : me.id;
+  const involved = me.role === "regulator" || v.custodian === org || v.inTransitTo === org || v.history.some((h) => h.actor === org);
+  if (!involved) return c.json({ id: v.id, kind: v.kind, restricted: true });
+  return c.json(v);
+});
 
 // ------------------------------------------------------------------ buyer (no account, read only)
 
