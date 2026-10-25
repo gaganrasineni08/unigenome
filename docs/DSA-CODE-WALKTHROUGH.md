@@ -7,7 +7,7 @@ This document explains every data structure and algorithm in UniGenome, and show
 - **The code**, with an explanation of what each part does.
 - **Complexity**.
 - **Where it is used**: the places in the app that call it.
-- **See it live**: where to show it in the running app (the DSA page is at `/dsa`).
+- **See it live**: where to show it in the running app (load the demo data from the home page first).
 
 All the data structures are written by hand in `shared/dsa/`. They are not library calls. The only library code is the raw SHA-256 and Ed25519 maths (`@noble/hashes`, `@noble/curves`), because writing your own cryptography is unsafe.
 
@@ -62,7 +62,7 @@ export const dnaOf = (f: UnitFields): string => hashOf(DOMAIN[f.kind], f);
 
 **Where it is used.** `dnaOf` when an item is issued (`src/pages/portals/Manufacturer.tsx` → `Issue`) and when any QR is checked (`server/logic.ts` → `verifyScan`: `row.dna === dnaOf(f)`). `hashOf` is used by every record hash (`shared/events.ts` → `eventHash`) and the claim code hash (`server/logic.ts` → `hashClaim`).
 
-**See it live.** `/dsa` → **1 · SHA-256**. Add one space to the input and about 60 of the 64 characters change (the avalanche effect).
+**See it live.** Manufacturer → **2 · Issue items**: the browser computes each item's DNA0 as the SHA-256 of its fields. Change one letter of a field and the whole hash changes (the avalanche effect), which is why an edited QR fails on the buyer page.
 
 ---
 
@@ -106,7 +106,7 @@ export function signUnit(f: UnitFields, secretKeyHex: string): SignedUnit {
 
 **Where it is used.** Issuing items and packing cartons (browser signs), every scan record (`src/lib/record.ts`), login challenge (`src/lib/session.tsx` + `server/app.ts` `/auth/login`), partner approval (`src/components/Approvals.tsx`), batch co-signing by the quality approver. The buyer's phone checks the item signature **offline** in `src/pages/portals/Buyer.tsx` (`verifyUnit(u, p.publicKey)` with cached public keys).
 
-**See it live.** `/dsa` → **2 · Signatures**: sign a message, then change one letter of the received message and the signature fails.
+**See it live.** Buyer → scan any genuine item: "Signature checked on your phone (works offline)". Edit one letter of the code in the link and scan again: the signature fails and the verdict is Counterfeit.
 
 ---
 
@@ -168,7 +168,7 @@ private grow() {
 - `revoked`: a `HashSet` of revoked party ids (`ix.revoked.has(signer.id)`), filled by the regulator's **Revoke** button.
 - `lastSeen`: unit id → last place and time it was scanned, for the clone check in topic 13.
 
-**See it live.** `/dsa` → **3 · Hash map** draws the real buckets, the load factor and how many times it has grown.
+**See it live.** It has no screen of its own: every portal lookup by id (scan, shipments, alerts) goes through these maps. The unit tests (`npm test`) check growing and collisions.
 
 ---
 
@@ -216,7 +216,7 @@ export function verifyChain(records, publicKeyOf): ChainCheck {
 
 **Where it is used.** Every scan (`POST /api/events`), and the chain check shown on each unit card ("Hash chain intact") in `server/app.ts` → `unitView`.
 
-**See it live.** `/dsa` → **4 · Hash chain**. Click any record to simulate editing it: that record and everything after turn red.
+**See it live.** Buyer → scan an item: "Custody records unbroken (hash chain of N records)". The e2e test (`npm run e2e`) edits one record through `GET /dsa/chain/:id?tamper=1` and shows the check fail from that record on.
 
 ---
 
@@ -276,7 +276,7 @@ export function verifyProof(leafId: string, proof: ProofStep[], root: string): b
 - Packing: the browser computes `merkleRoot(children)` (`src/pages/portals/Manufacturer.tsx` → `Pack`), and the server recomputes and rejects a mismatch (`server/app.ts`: `if (merkleRoot(sorted) !== f.root) bad(...)`).
 - **Random spot checks**: when a retailer opens a carton, the server picks random items and sends `merkleProof` for each (`server/app.ts`, `UNPACKED`). The retailer scans those items and the browser checks `verifyProof` locally (`src/components/ScanAct.tsx` → `spotScan`). This catches an item swapped into the carton.
 
-**See it live.** `/dsa` → **5 · Merkle tree**: the green path goes from the chosen item to the root, and the amber boxes are the proof. The proof is checked in your browser.
+**See it live.** Manufacturer → **3 · Pack**: the carton QR carries the Merkle root of its items. Warehouse → scan the carton → **Receive**: the server asks for a spot check of random items, each proved with its Merkle path.
 
 ---
 
@@ -325,7 +325,7 @@ return { order, items: order.filter((x) => kind.get(x) === "item"), kind, kids }
 
 **Where it is used.** `server/app.ts` scan endpoint (`itemsInside: sub.items.length`, and the `lastSeen` update loop), `server/logic.ts` → `effectiveCustody`, `topOf`, and the recall analysis.
 
-**See it live.** `/dsa` → **6 · Tree + DFS** shows the tree with the DFS visit numbers. In the app: scan a carton in the warehouse portal and press **Receive**: "12 items updated by this one scan".
+**See it live.** Scan a carton in the warehouse portal and press **Receive**: "12 items updated by this one scan".
 
 ---
 
@@ -383,7 +383,7 @@ const result = bfs(g, batch.mfr);
 
 **Where it is used.** Regulator portal → **Recall** (`src/pages/portals/Regulator.tsx`), `GET /api/recall/:batch`.
 
-**See it live.** `/dsa` → **7 · Graph + BFS** or Regulator → Recall: press **Replay BFS** or step through it, with the real queue shown below the graph.
+**See it live.** Regulator → Recall: press **Replay BFS** or step through it, with the real queue shown below the graph.
 
 ---
 
@@ -435,7 +435,7 @@ export function dijkstra(g: Graph, src: string) {
 
 **Where it is used.** Dispatch form (shows "Expected arrival ..."), `POST /api/events` with `DISPATCHED` stores `eta_ts`, and `sweepOverdue` raises an **overdue** alert when a shipment is past its ETA plus margin.
 
-**See it live.** `/dsa` → **8 · Dijkstra** lists the learned edges, the shortest times, the routes, and the order nodes were settled.
+**See it live.** Dispatch a carton from any portal: the result shows "Expected arrival … fastest known route: A → B → C". The Deliveries list has an "Expected by" column, and late shipments raise an overdue alert.
 
 ---
 
@@ -512,7 +512,7 @@ const merged = kWayMerge(lists, (e) => Number(e.ts)); // O(N log k) merge with a
 ```
 `historyLists` returns the item's own records plus each container's records **only for the time window the item was inside it** (from `pack_links.from_ts` to `to_ts`).
 
-**See it live.** `/dsa` → **9 · Heap** draws the alert heap as a tree and as the stored array. Regulator → Alerts shows the same array above the list.
+**See it live.** Regulator → Alerts shows the heap's stored array above the list, most severe first.
 
 ---
 
@@ -564,7 +564,7 @@ for (const it of sorted) if (fits(it)) take(it);
 
 **Where it is used.** Regulator → **Recall** (the table, DP vs greedy result, and the DP table itself).
 
-**See it live.** `/dsa` → **10 · Knapsack DP**: edit costs/risks and move the sliders, and both answers recompute.
+**See it live.** Regulator → Recall → **2 · Who to inspect**: the knapsack answer and the greedy answer side by side.
 
 ---
 
@@ -612,7 +612,7 @@ search(prefix: string, limit = 20) {
 
 **Where it is used.** `server/indexes.ts` inserts every batch, item, carton and pallet id. `GET /api/search?q=` uses `ix.ids.search(q, 15)`.
 
-**See it live.** `/dsa` → **11 · Trie**: type a prefix to see the matches and the trie drawn below that node.
+**See it live.** The server's `GET /search?q=<prefix>` returns the matching ids (the e2e test calls it). There is no search box on screen.
 
 ---
 
@@ -675,7 +675,7 @@ range(lo: string, hi: string) {
 
 **Where it is used.** `server/indexes.ts` (`ix.expiry.insert(exp, batchId)` for every batch), `GET /api/expiring?days=` → Regulator → **Expiring**.
 
-**See it live.** `/dsa` → **12 · AVL tree**: the live expiry index, and a sandbox where inserting dates in increasing order shows the rotations happening.
+**See it live.** Regulator → **Expiring**: a range query on the AVL tree for batches expiring in the next N days.
 
 ---
 
@@ -727,7 +727,7 @@ const ok = km <= SHELF_RADIUS_KM;
 
 **Where it is used.** Every buyer scan (`POST /api/verify`), and every staff scan updates `lastSeen` for all items inside (topic 6).
 
-**See it live.** `/dsa` → **13 · Haversine**: Hyderabad to Delhi is about 1,254 km; in 40 minutes that is about 1,880 km/h, flagged. In the app: scan a sold item's QR from the buyer page in Hyderabad, then again with the browser location set to Delhi.
+**See it live.** Hyderabad to Delhi is about 1,254 km; in 40 minutes that is about 1,880 km/h, flagged. In the app: scan a sold item's QR from the buyer page in Hyderabad, then again with the browser location set to Delhi.
 
 ---
 
