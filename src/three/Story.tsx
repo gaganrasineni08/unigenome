@@ -47,72 +47,110 @@ const sample = (arr: number[], f: number) => {
 };
 
 // ---------------------------------------------------------------- camera shots
-// Each shot returns [camera position, look-at point], given the hauler's position and heading and
-// a slow clock so the camera keeps drifting while you read.
-type Shot = (truck: THREE.Vector3, deg: number, t: number) => [THREE.Vector3, THREE.Vector3];
+// Each shot returns [camera position, look-at point, lens fov], given the hauler's position and
+// heading and a slow clock so the camera keeps drifting while you read. Wide establishing shots use
+// a wide lens; close-ups a long one, which flattens the background behind the subject.
+type Shot = (truck: THREE.Vector3, deg: number, t: number) => [THREE.Vector3, THREE.Vector3, number];
 const v = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
 const SHOTS: Shot[] = [
-  (_, __, t) => [ring(125, 238 + t * 2.2, 78), v(0, 2, 0)], // 0 hero: the whole ring
-  () => [ring(12, 186, 20), ring(R_CHECK, 210, 6)], // 1 factory, from inside the ring
-  (tr, d) => [ring(R_ROAD - 16, d + 3, 7.5), tr.clone().setY(2.6)], // 2 carton QR close-up beside the hauler
-  (tr, d) => [ring(R_ROAD - 3, d - 24, 12), ring(R_ROAD, d + 12, 2)], // 3 chase, behind and above
-  () => [ring(10, 280, 20), ring(R_CHECK, 300, 5)], // 4 warehouse
-  () => [ring(6, 6, 22), ring(R_CHECK, 30, 7)], // 5 retailer
-  () => [ring(22, 114, 14), ring(R_CHECK, 120, 9)], // 6 the giant phone, looking over its arch
-  (_, __, t) => [ring(58, 150 + t * 3, 46), v(0, 22, 0)], // 7 the regulator's tower
-  (_, __, t) => [ring(200, 210 + t * 1.5, 135), v(0, 0, 0)], // 8 pull back for the portals
+  (_, __, t) => [ring(118, 236 + t * 1.6, 58), v(0, 6, 0), 44], // 0 hero: the whole ring
+  (_, __, t) => [ring(12, 186 + Math.sin(t * 0.2) * 2, 13), ring(47, 211, 8), 46], // 1 factory, from inside the ring
+  (tr, d) => [ring(R_ROAD - 10.5, d + 5, 4.6), tr.clone().setY(2.5), 32], // 2 carton QR, beside and a little ahead of the hauler
+  (_, d) => [ring(R_ROAD + 1.5, d - 25, 5.5), ring(R_ROAD - 1, d + 16, 1.5), 50], // 3 chase, low behind the hauler
+  (_, __, t) => [ring(9, 274 + Math.sin(t * 0.2) * 2, 15), ring(47, 300, 6), 44], // 4 warehouse
+  (_, __, t) => [ring(12, 50 + Math.sin(t * 0.2) * 2, 17), ring(47, 24, 8), 44], // 5 retailer, from past its arch so the gantry doesn't block the shop
+  (_, __, t) => [ring(19, 110 + Math.sin(t * 0.2) * 2, 10), ring(48, 121, 9), 36], // 6 the giant phone, over its arch
+  (_, __, t) => [ring(56, 150 + t * 2.5, 36), v(0, 24, 0), 44], // 7 the regulator's tower
+  (_, __, t) => [ring(190, 212 + t * 1.2, 120), v(0, 0, 0), 46], // 8 pull back for the portals
 ];
 
-function CameraRig({ chapter, truckState }: { chapter: P; truckState: MutableRefObject<{ pos: THREE.Vector3; deg: number }> }) {
+const smoother = (t: number) => t * t * t * (t * (t * 6 - 15) + 10);
+/** Shortest signed angle from a to b. */
+const turn = (a: number, b: number) => Math.atan2(Math.sin(b - a), Math.cos(b - a));
+
+function CameraRig({ chapter, sides, truckState }: { chapter: P; sides: number[]; truckState: MutableRefObject<{ pos: THREE.Vector3; deg: number }> }) {
   const { camera, size } = useThree();
-  const st = useMemo(() => ({ pos: new THREE.Vector3(), look: new THREE.Vector3(), vel: new THREE.Vector3(), roll: 0, view: "", init: false }), []);
-  const a = useMemo(() => [new THREE.Vector3(), new THREE.Vector3()], []);
+  const st = useMemo(
+    () => ({ f: chapter.current, pos: new THREE.Vector3(), look: new THREE.Vector3(), prev: new THREE.Vector3(), mouse: new THREE.Vector2(), aim: new THREE.Vector2(), roll: 0, view: "", init: false }),
+    [chapter],
+  );
+  const tmp = useMemo(() => ({ p: new THREE.Vector3(), l: new THREE.Vector3(), right: new THREE.Vector3(), up: new THREE.Vector3() }), []);
   const reduced = useMemo(() => matchMedia("(prefers-reduced-motion: reduce)").matches, []);
+  useEffect(() => {
+    const on = (e: PointerEvent) => st.aim.set((e.clientX / innerWidth) * 2 - 1, (e.clientY / innerHeight) * 2 - 1);
+    addEventListener("pointermove", on, { passive: true });
+    return () => removeEventListener("pointermove", on);
+  }, [st]);
   useFrame(({ clock }, dt) => {
     dt = Math.min(dt, 0.1);
     const t = reduced ? 0 : clock.elapsedTime;
-    const f = clamp(chapter.current, 0, SHOTS.length - 1);
+    const cam = camera as THREE.PerspectiveCamera;
+    // Glide after the scroll position instead of jumping with every wheel notch. The shot is then
+    // computed exactly from the smoothed chapter, so the camera and its target always agree.
+    st.f = reduced ? chapter.current : THREE.MathUtils.damp(st.f, chapter.current, 2.4, dt);
+    const f = clamp(st.f, 0, SHOTS.length - 1);
     const i = Math.min(SHOTS.length - 2, Math.floor(f));
-    const k = ease(f - i);
+    const k = smoother(clamp(f - i));
     const { pos: tp, deg } = truckState.current;
-    const [p0, l0] = SHOTS[i](tp, deg, t);
-    const [p1, l1] = SHOTS[i + 1](tp, deg, t);
-    a[0].copy(p0).lerp(p1, k);
-    a[1].copy(l0).lerp(l1, k);
-    // Mid-flight, lift the camera so it arcs over the scene instead of cutting through buildings.
-    a[0].y += Math.sin(Math.PI * k) * 10;
+    const [p0, l0, fov0] = SHOTS[i](tp, deg, t);
+    const [p1, l1, fov1] = SHOTS[i + 1](tp, deg, t);
+    // Fly round the ring rather than straight across it: blend angle, radius and height about the
+    // centre, and rise in proportion to the distance covered so the path clears the buildings.
+    const a0 = Math.atan2(-p0.z, p0.x);
+    const a = a0 + turn(a0, Math.atan2(-p1.z, p1.x)) * k;
+    const r = THREE.MathUtils.lerp(Math.hypot(p0.x, p0.z), Math.hypot(p1.x, p1.z), k);
+    const lift = Math.sin(Math.PI * k) * Math.min(22, p0.distanceTo(p1) * 0.22);
+    tmp.p.set(r * Math.cos(a), THREE.MathUtils.lerp(p0.y, p1.y, k) + lift, -r * Math.sin(a));
+    tmp.l.copy(l0).lerp(l1, k);
     // Portrait screens see less width: back off along the view line.
     const aspect = size.width / size.height;
-    if (aspect < 1.2) a[0].sub(a[1]).multiplyScalar(Math.min(2, 1.15 / aspect)).add(a[1]);
+    if (aspect < 1.2) tmp.p.sub(tmp.l).multiplyScalar(Math.min(2, 1.15 / aspect)).add(tmp.l);
+    // A slow handheld sway, and a little parallax towards the pointer.
+    if (!reduced) {
+      st.mouse.x = THREE.MathUtils.damp(st.mouse.x, st.aim.x, 2, dt);
+      st.mouse.y = THREE.MathUtils.damp(st.mouse.y, st.aim.y, 2, dt);
+      tmp.right.subVectors(tmp.l, tmp.p).cross(UP).normalize();
+      const reach = 0.04 * tmp.p.distanceTo(tmp.l);
+      tmp.p.addScaledVector(tmp.right, st.mouse.x * reach + Math.sin(t * 0.37) * 0.25 + Math.sin(t * 0.91 + 1.3) * 0.1);
+      tmp.p.y += -st.mouse.y * reach * 0.5 + Math.sin(t * 0.53 + 0.7) * 0.18;
+      tmp.l.y += Math.sin(t * 0.29 + 2.1) * 0.12;
+    }
     if (!st.init) {
-      st.pos.copy(a[0]);
-      st.look.copy(a[1]);
+      st.pos.copy(tmp.p);
+      st.look.copy(tmp.l);
       st.init = true;
     }
-    const prev = camera.position.clone();
-    const damp = 1 - Math.exp(-dt * 3.2);
-    st.pos.lerp(a[0], damp);
-    st.look.lerp(a[1], damp);
+    // A light final smoothing only takes the edge off the hauler-following shots.
+    st.prev.copy(st.pos);
+    st.pos.x = THREE.MathUtils.damp(st.pos.x, tmp.p.x, 9, dt);
+    st.pos.y = THREE.MathUtils.damp(st.pos.y, tmp.p.y, 9, dt);
+    st.pos.z = THREE.MathUtils.damp(st.pos.z, tmp.p.z, 9, dt);
+    st.look.x = THREE.MathUtils.damp(st.look.x, tmp.l.x, 9, dt);
+    st.look.y = THREE.MathUtils.damp(st.look.y, tmp.l.y, 9, dt);
+    st.look.z = THREE.MathUtils.damp(st.look.z, tmp.l.z, 9, dt);
     camera.position.copy(st.pos);
     camera.lookAt(st.look);
-    // Bank into sideways motion, like a camera on a drone.
-    st.vel.subVectors(camera.position, prev).divideScalar(Math.max(dt, 1e-3));
-    const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion);
-    const target = reduced ? 0 : clamp(-st.vel.dot(right) * 0.006, -0.16, 0.16);
-    st.roll += (target - st.roll) * (1 - Math.exp(-dt * 2.5));
+    // Bank gently into sideways motion, like a camera on a drone.
+    tmp.right.set(1, 0, 0).applyQuaternion(camera.quaternion);
+    const side = st.pos.clone().sub(st.prev).dot(tmp.right) / Math.max(dt, 1e-3);
+    st.roll = THREE.MathUtils.damp(st.roll, reduced ? 0 : clamp(-side * 0.0025, -0.06, 0.06), 3, dt);
     camera.rotateZ(st.roll);
-    // The story card covers part of the screen: the left side on wide screens, the bottom on phones.
-    // Frame the subject beside it by rendering part of a larger view. The portals chapter centres it.
-    const shift = 0.34 * (1 - clamp(f - (SHOTS.length - 2)));
+    const fov = THREE.MathUtils.lerp(fov0, fov1, k);
+    const fovChanged = Math.abs(cam.fov - fov) > 1e-3;
+    if (fovChanged) cam.fov = fov;
+    // The story card covers part of the screen: one side on wide screens (it alternates), the bottom
+    // on phones. Frame the subject beside it by rendering part of a larger view; when the card swaps
+    // sides the subject swings across through the centre. The portals chapter centres it.
     const wide = aspect > 1.2;
-    const key = `${size.width}x${size.height}:${wide}:${shift.toFixed(3)}`;
+    const sideNow = THREE.MathUtils.lerp(sides[i] ?? 0, sides[i + 1] ?? 0, k);
+    const shift = wide ? 0.32 * Math.abs(sideNow) : 0.34 * (1 - clamp(f - (SHOTS.length - 2)));
+    const key = `${size.width}x${size.height}:${wide}:${shift.toFixed(3)}:${sideNow > 0}`;
     if (key !== st.view) {
       st.view = key;
-      const cam = camera as THREE.PerspectiveCamera;
       if (shift < 1e-3) cam.clearViewOffset();
-      else if (wide) cam.setViewOffset(Math.round(size.width * (1 + shift)), size.height, 0, 0, size.width, size.height);
+      else if (wide) cam.setViewOffset(Math.round(size.width * (1 + shift)), size.height, sideNow > 0 ? Math.round(size.width * shift) : 0, 0, size.width, size.height);
       else cam.setViewOffset(size.width, Math.round(size.height * (1 + shift)), 0, Math.round(size.height * shift), size.width, size.height);
-    }
+    } else if (fovChanged) cam.updateProjectionMatrix();
   });
   return null;
 }
@@ -218,6 +256,15 @@ function World({ chapter, truckState }: { chapter: P; truckState: MutableRefObje
       const m = get(n) as THREE.Mesh;
       m.material = new THREE.MeshStandardMaterial({ map: tex, emissiveMap: tex, emissive: new THREE.Color("#ffffff"), emissiveIntensity: 0.35, roughness: 0.7, side: THREE.DoubleSide });
     }
+    // Solid parts cast moon shadows; glowing trim, glass and the far skyline don't need to.
+    scene.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (!m.isMesh) return;
+      const mat = m.material as THREE.MeshStandardMaterial;
+      const glows = !!mat.emissive && mat.emissive.getHex() !== 0 && (mat.emissiveIntensity ?? 0) > 0.5;
+      m.castShadow = !glows && m.name !== "Skyline";
+      m.receiveShadow = true;
+    });
     const screen = phoneTexture();
     (get("PhoneScreen") as THREE.Mesh).material = new THREE.MeshBasicMaterial({ map: screen, toneMapped: false, side: THREE.DoubleSide });
     return { hauler: get("Hauler"), haloA: get("Halo_a"), haloB: get("Halo_b"), spin: get("Retailer_spin"), beacon: get("Regulator_beacon") as THREE.Mesh };
@@ -250,6 +297,8 @@ function World({ chapter, truckState }: { chapter: P; truckState: MutableRefObje
     <>
       <primitive object={scene} />
       <HaulerGlow truckState={truckState} />
+      <CheckpointLights truckState={truckState} />
+      <BeaconLight />
       {CP_LIST.map((k) => (
         <Scanner key={k} cp={k} truckState={truckState} />
       ))}
@@ -258,22 +307,100 @@ function World({ chapter, truckState }: { chapter: P; truckState: MutableRefObje
   );
 }
 
-/** A cyan light riding under the hauler so it washes the wet road. */
+/** A cyan light riding under the hauler so it washes the wet road, and headlights throwing a cone
+ * down the road ahead of it (the road curves left, so the beam aims a few degrees further round). */
 function HaulerGlow({ truckState }: { truckState: MutableRefObject<{ pos: THREE.Vector3; deg: number }> }) {
   const l = useRef<THREE.PointLight>(null);
-  const h = useRef<THREE.PointLight>(null);
+  const head = useRef<THREE.SpotLight>(null);
+  const tail = useRef<THREE.PointLight>(null);
+  const aim = useMemo(() => new THREE.Object3D(), []);
   const fwd = useMemo(() => new THREE.Vector3(), []);
   useFrame(() => {
     const { pos, deg } = truckState.current;
     l.current?.position.copy(pos).setY(0.9);
     const a = THREE.MathUtils.degToRad(deg);
     fwd.set(-Math.sin(a), 0, -Math.cos(a));
-    h.current?.position.copy(pos).addScaledVector(fwd, 9).setY(1.6);
+    head.current?.position.copy(pos).addScaledVector(fwd, 5.8).setY(2);
+    tail.current?.position.copy(pos).addScaledVector(fwd, -7).setY(1.4);
+    ring(R_ROAD, deg + 30, 0, aim.position);
+    aim.updateMatrixWorld();
   });
   return (
     <>
-      <pointLight ref={l} color="#4FC3F7" intensity={25} distance={12} decay={2} />
-      <pointLight ref={h} color="#fff4e0" intensity={30} distance={18} decay={2} />
+      <primitive object={aim} />
+      <pointLight ref={l} color="#4FC3F7" intensity={30} distance={14} decay={2} />
+      <spotLight ref={head} target={aim} color="#fff1dc" intensity={900} distance={60} angle={0.42} penumbra={0.7} decay={2} />
+      <pointLight ref={tail} color="#ff2a3a" intensity={18} distance={9} decay={2} />
+    </>
+  );
+}
+
+/** A coloured flood at each checkpoint that flares while the hauler is being scanned there. */
+function CheckpointLights({ truckState }: { truckState: MutableRefObject<{ pos: THREE.Vector3; deg: number }> }) {
+  const refs = useRef<Array<THREE.PointLight | null>>([]);
+  useFrame(({ clock }, dt) => {
+    CP_LIST.forEach((k, i) => {
+      const l = refs.current[i];
+      if (!l) return;
+      const near = clamp(1 - Math.abs(truckState.current.deg - CP[k]) / 14);
+      const flicker = near > 0.3 ? 0.85 + 0.15 * Math.sin(clock.elapsedTime * 24 + i) : 1;
+      l.intensity = THREE.MathUtils.damp(l.intensity, (50 + 260 * near) * flicker, 6, Math.min(dt, 0.1));
+    });
+  });
+  return (
+    <>
+      {CP_LIST.map((k, i) => {
+        const p = ring(R_ROAD + 2, CP[k], 11);
+        return <pointLight key={k} ref={(l) => void (refs.current[i] = l)} position={p} color={COLORS[k]} intensity={50} distance={38} decay={2} />;
+      })}
+    </>
+  );
+}
+
+/** The red beacon on the regulator's tower lights the halos and the top of the shaft as it pulses. */
+function BeaconLight() {
+  const l = useRef<THREE.PointLight>(null);
+  useFrame(({ clock }) => {
+    if (l.current) l.current.intensity = 40 + 520 * Math.max(0, Math.sin(clock.elapsedTime * 3.2));
+  });
+  return <pointLight ref={l} position={[0, 40.5, 0]} color="#ff3b30" distance={45} decay={2} />;
+}
+
+// The colour of each chapter, for the mood light: the hero and the portals in mint.
+const MOOD = ["#02C39A", COLORS.factory, COLORS.factory, COLORS.warehouse, COLORS.warehouse, COLORS.retailer, COLORS.buyer, COLORS.regulator, "#02C39A"];
+
+/** Cool moonlight from high on one side (with shadows), and a low rim light from the other that
+ * takes on the colour of the chapter you're reading. */
+function Lights({ chapter, shadows }: { chapter: P; shadows: boolean }) {
+  const rim = useRef<THREE.DirectionalLight>(null);
+  const cols = useMemo(() => MOOD.map((c) => new THREE.Color(c)), []);
+  const c = useMemo(() => new THREE.Color(), []);
+  useFrame((_, dt) => {
+    const f = clamp(chapter.current, 0, MOOD.length - 1);
+    const i = Math.min(MOOD.length - 2, Math.floor(f));
+    c.copy(cols[i]).lerp(cols[i + 1], ease(f - i));
+    rim.current?.color.lerp(c, 1 - Math.exp(-Math.min(dt, 0.1) * 3));
+  });
+  return (
+    <>
+      <ambientLight intensity={0.08} />
+      <hemisphereLight args={["#4a8fb8", "#020407", 0.28]} />
+      <directionalLight
+        position={[-70, 110, 55]}
+        intensity={1.25}
+        color="#a8c6ff"
+        castShadow={shadows}
+        shadow-mapSize={[2048, 2048]}
+        shadow-bias={-0.0004}
+        shadow-normalBias={0.05}
+        shadow-camera-left={-72}
+        shadow-camera-right={72}
+        shadow-camera-top={72}
+        shadow-camera-bottom={-72}
+        shadow-camera-near={10}
+        shadow-camera-far={320}
+      />
+      <directionalLight ref={rim} position={[80, 18, -60]} intensity={0.9} color="#02C39A" />
     </>
   );
 }
@@ -413,7 +540,7 @@ function Sky() {
 
 function Ground({ low }: { low: boolean }) {
   return (
-    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.02, 0]}>
+    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.02, 0]} receiveShadow>
       <circleGeometry args={[420, 64]} />
       <MeshReflectorMaterial
         blur={[400, 120]}
@@ -432,25 +559,28 @@ function Ground({ low }: { low: boolean }) {
   );
 }
 
-export default function Story({ progress }: { progress: P }) {
+export default function Story({ progress, sides }: { progress: P; sides: number[] }) {
   const low = useMemo(() => Math.min(innerWidth, innerHeight) < 700, []);
   const dpr = Math.min(low ? 1.5 : 1.75, window.devicePixelRatio || 1);
   const truckState = useRef({ pos: new THREE.Vector3(), deg: TRUCK[0] });
   useEffect(() => () => useGLTF.clear(MODEL), []);
   return (
-    <Canvas dpr={dpr} camera={{ position: [80, 60, 60], fov: 42, near: 0.5, far: 1200 }} gl={{ antialias: true, powerPreference: "high-performance" }}>
+    <Canvas
+      dpr={dpr}
+      shadows={low ? false : "soft"}
+      camera={{ position: [80, 60, 60], fov: 44, near: 0.5, far: 1200 }}
+      gl={{ antialias: true, powerPreference: "high-performance", toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.15 }}
+    >
       <color attach="background" args={["#01040a"]} />
       <fog attach="fog" args={["#04121a", 120, 420]} />
       <Sky />
       <Stars radius={300} depth={80} count={low ? 1500 : 4000} factor={6} saturation={0.4} fade speed={0.6} />
-      <ambientLight intensity={0.25} />
-      <hemisphereLight args={["#5aa7c8", "#05080c", 0.4]} />
-      <directionalLight position={[-60, 90, 40]} intensity={1.1} color="#9fc8ff" />
+      <Lights chapter={progress} shadows={!low} />
       <World chapter={progress} truckState={truckState} />
       <Labels chapter={progress} />
       <Sparkles count={low ? 60 : 160} scale={[120, 30, 120]} position={[0, 14, 0]} size={3} speed={0.3} opacity={0.5} color="#9ff0e0" />
       <Ground low={low} />
-      <CameraRig chapter={progress} truckState={truckState} />
+      <CameraRig chapter={progress} sides={sides} truckState={truckState} />
       <EffectComposer multisampling={low ? 0 : 4}>
         <Bloom mipmapBlur intensity={1.1} luminanceThreshold={0.62} luminanceSmoothing={0.3} />
         <Vignette eskil={false} offset={0.2} darkness={0.7} />
