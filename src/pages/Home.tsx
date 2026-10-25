@@ -1,4 +1,5 @@
-// Home: a scroll story over the 3D scene (factory -> road -> warehouse -> shop -> buyer's phone), then the portals.
+// Home: a scroll story over the 3D ring road (factory -> warehouse -> shop -> buyer's phone, watched by the
+// regulator's tower in the middle), then the portals.
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Alert, Button, PORTALS } from "../components/ui";
@@ -49,6 +50,12 @@ const STEPS = [
     body: "The signature is checked on the phone, even offline. Then the full journey, map and verdict appear. The buyer can't change anything, but can raise a complaint, which goes straight to the regulator's priority queue.",
     color: PORTALS.buyer.color,
   },
+  {
+    tag: "7 · Watch",
+    title: "The regulator sees the whole ring.",
+    body: "Every checkpoint reports to the regulator. Alerts wait in a max-heap so the most serious comes first, and a recall walks the supply-chain graph with BFS to find every shop that got the batch.",
+    color: PORTALS.regulator.color,
+  },
 ];
 
 export default function Home() {
@@ -62,9 +69,21 @@ export default function Home() {
     }
   });
   useEffect(() => {
+    // The 3D scene follows a fractional chapter: 0 while the first section fills the screen, 1 at the
+    // second, and so on, with the portals as the last chapter.
     const on = () => {
-      const max = document.documentElement.scrollHeight - innerHeight;
-      progress.current = max > 0 ? scrollY / max : 0;
+      const els = Array.from(document.querySelectorAll<HTMLElement>("[data-chapter]"));
+      const mid = scrollY + innerHeight / 2;
+      const centres = els.map((el) => el.offsetTop + Math.min(el.offsetHeight, innerHeight) / 2);
+      let f = 0;
+      if (mid >= centres[centres.length - 1]) f = centres.length - 1;
+      else
+        for (let i = 0; i < centres.length - 1; i++)
+          if (mid < centres[i + 1]) {
+            f = i + Math.max(0, (mid - centres[i]) / (centres[i + 1] - centres[i]));
+            break;
+          }
+      progress.current = f;
     };
     on();
     addEventListener("scroll", on, { passive: true });
@@ -85,35 +104,35 @@ export default function Home() {
         ) : (
           <div className="h-full w-full bg-[radial-gradient(circle_at_30%_20%,#0b4a50,#031b1e)]" />
         )}
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-abyss/70 via-abyss/10 to-transparent" />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#01040a]/75 via-[#01040a]/10 to-transparent" />
       </div>
 
-      <header className="fixed inset-x-0 top-0 z-30 bg-abyss/60 backdrop-blur-md">
+      <header className="lg-bar fixed inset-x-0 top-0 z-30">
         <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-4">
           <img src="/icon.svg" className="h-9 w-9" alt="" />
           <span className="font-display text-xl font-semibold">UniGenome</span>
           <nav className="ml-auto flex gap-1 text-sm">
             <Link to="/dsa" className="rounded-lg px-3 py-1.5 text-mute hover:text-ink">DSA</Link>
-            <a href="#portals" className="rounded-lg bg-white/10 px-3 py-1.5 font-medium">Open a portal</a>
+            <a href="#portals" className="lg-pill rounded-lg px-3 py-1.5 font-medium">Open a portal</a>
           </nav>
         </div>
       </header>
 
       <main className="relative z-10">
         {STEPS.map((s, i) => (
-          <section key={i} className="flex min-h-[100svh] items-center px-4">
+          <section key={i} data-chapter className="flex min-h-[100svh] items-end px-4 pb-8 sm:items-center sm:pb-0">
             <div className="mx-auto w-full max-w-6xl">
-              <div className={`glass max-w-md rounded-3xl p-6 sm:p-8 ${i === 0 ? "max-w-xl" : ""}`}>
+              <div className={`glass glass-strong max-w-md rounded-3xl p-6 sm:p-8 ${i === 0 ? "max-w-xl" : ""}`}>
                 <div className="mb-3 text-xs font-bold uppercase tracking-[0.2em]" style={{ color: s.color ?? "#02C39A" }}>{s.tag}</div>
                 <h2 className={`font-display font-semibold leading-tight ${i === 0 ? "text-4xl sm:text-6xl" : "text-3xl sm:text-4xl"}`}>{s.title}</h2>
-                <p className="mt-4 text-base leading-relaxed text-mute sm:text-lg">{s.body}</p>
+                <p className="mt-4 text-base leading-relaxed text-[#c9dbe0] sm:text-lg">{s.body}</p>
                 {i === 0 && (
                   <div className="mt-6 flex flex-wrap gap-2">
                     <Link to="/buyer"><Button>Scan a product</Button></Link>
                     <a href="#portals"><Button variant="soft">I work in the supply chain</Button></a>
                   </div>
                 )}
-                {i === 0 && <div className="mt-8 animate-bounce text-sm text-mute">Scroll to follow a product ↓</div>}
+                {i === 0 && <div className="mt-8 animate-bounce text-sm text-mute motion-reduce:animate-none">Scroll to ride along with a carton ↓</div>}
               </div>
             </div>
           </section>
@@ -162,7 +181,7 @@ function Portals() {
     ["regulator", "/regulator", "Alerts by priority, recall planning (BFS + knapsack), expiring stock, partner approvals."],
   ];
   return (
-    <section id="portals" className="relative min-h-[100svh] bg-gradient-to-b from-transparent via-abyss/90 to-abyss px-4 pb-20 pt-32">
+    <section id="portals" data-chapter className="relative min-h-[100svh] bg-gradient-to-b from-transparent via-[#01040a]/70 to-[#01040a]/95 px-4 pb-20 pt-32">
       <div className="mx-auto max-w-6xl">
         <h2 className="font-display text-4xl font-semibold">Choose your portal</h2>
         <p className="mt-2 max-w-2xl text-mute">Each role has its own screen with only the steps it needs.</p>
