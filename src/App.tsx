@@ -10,7 +10,6 @@ const BuyerPortal = lazy(() => import("./pages/portals/Buyer"));
 const VerifyPage = lazy(() => import("./pages/portals/Buyer").then((m) => ({ default: m.VerifyPage })));
 const RegulatorPortal = lazy(() => import("./pages/portals/Regulator"));
 const Register = lazy(() => import("./pages/Register"));
-const Dsa = lazy(() => import("./pages/Dsa"));
 
 export default function App() {
   return (
@@ -24,7 +23,6 @@ export default function App() {
         <Route path="/retailer/*" element={<RetailerPortal />} />
         <Route path="/regulator/*" element={<RegulatorPortal />} />
         <Route path="/register" element={<Register />} />
-        <Route path="/dsa" element={<Dsa />} />
         <Route path="*" element={<Home />} />
       </Routes>
     </Suspense>

@@ -53,20 +53,35 @@ const sample = (arr: number[], f: number) => {
 type Shot = (truck: THREE.Vector3, deg: number, t: number) => [THREE.Vector3, THREE.Vector3, number];
 const v = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
 const SHOTS: Shot[] = [
-  (_, __, t) => [ring(118, 236 + t * 1.6, 58), v(0, 6, 0), 44], // 0 hero: the whole ring
+  // The drifts are bounded sways, not endless orbits, so every shot sits where it was framed however
+  // long the page has been open, and each flight between shots always goes the same way round.
+  (_, __, t) => [ring(118, 236 + Math.sin(t * 0.06) * 12, 58), v(0, 6, 0), 44], // 0 hero: the whole ring
   (_, __, t) => [ring(12, 186 + Math.sin(t * 0.2) * 2, 13), ring(47, 211, 8), 46], // 1 factory, from inside the ring
   (tr, d) => [ring(R_ROAD - 10.5, d + 5, 4.6), tr.clone().setY(2.5), 32], // 2 carton QR, beside and a little ahead of the hauler
   (_, d) => [ring(R_ROAD + 1.5, d - 25, 5.5), ring(R_ROAD - 1, d + 16, 1.5), 50], // 3 chase, low behind the hauler
   (_, __, t) => [ring(9, 274 + Math.sin(t * 0.2) * 2, 15), ring(47, 300, 6), 44], // 4 warehouse
   (_, __, t) => [ring(12, 50 + Math.sin(t * 0.2) * 2, 17), ring(47, 24, 8), 44], // 5 retailer, from past its arch so the gantry doesn't block the shop
   (_, __, t) => [ring(19, 110 + Math.sin(t * 0.2) * 2, 10), ring(48, 121, 9), 36], // 6 the giant phone, over its arch
-  (_, __, t) => [ring(56, 150 + t * 2.5, 36), v(0, 24, 0), 44], // 7 the regulator's tower
-  (_, __, t) => [ring(190, 212 + t * 1.2, 120), v(0, 0, 0), 46], // 8 pull back for the portals
+  (_, __, t) => [ring(56, 160 + Math.sin(t * 0.08) * 10, 36), v(0, 24, 0), 44], // 7 the regulator's tower
+  (_, __, t) => [ring(190, 212 + Math.sin(t * 0.05) * 10, 120), v(0, 0, 0), 46], // 8 pull back for the portals
 ];
 
 const smoother = (t: number) => t * t * t * (t * (t * 6 - 15) + 10);
 /** Shortest signed angle from a to b. */
 const turn = (a: number, b: number) => Math.atan2(Math.sin(b - a), Math.cos(b - a));
+/** Blend two points round the ring's centre (angle, radius and height) rather than in a straight
+ * line. A point on the axis has no angle of its own, so it takes the other one's. */
+const orbit = (p: THREE.Vector3, q: THREE.Vector3, k: number, out: THREE.Vector3) => {
+  const rp = Math.hypot(p.x, p.z);
+  const rq = Math.hypot(q.x, q.z);
+  let ap = Math.atan2(-p.z, p.x);
+  let aq = Math.atan2(-q.z, q.x);
+  if (rp < 0.5) ap = aq;
+  if (rq < 0.5) aq = ap;
+  const a = ap + turn(ap, aq) * k;
+  const r = THREE.MathUtils.lerp(rp, rq, k);
+  return out.set(r * Math.cos(a), THREE.MathUtils.lerp(p.y, q.y, k), -r * Math.sin(a));
+};
 
 function CameraRig({ chapter, sides, truckState }: { chapter: P; sides: number[]; truckState: MutableRefObject<{ pos: THREE.Vector3; deg: number }> }) {
   const { camera, size } = useThree();
@@ -74,7 +89,10 @@ function CameraRig({ chapter, sides, truckState }: { chapter: P; sides: number[]
     () => ({ f: chapter.current, pos: new THREE.Vector3(), look: new THREE.Vector3(), prev: new THREE.Vector3(), mouse: new THREE.Vector2(), aim: new THREE.Vector2(), roll: 0, view: "", init: false }),
     [chapter],
   );
-  const tmp = useMemo(() => ({ p: new THREE.Vector3(), l: new THREE.Vector3(), right: new THREE.Vector3(), up: new THREE.Vector3() }), []);
+  const tmp = useMemo(
+    () => ({ p: new THREE.Vector3(), l: new THREE.Vector3(), right: new THREE.Vector3(), d0: new THREE.Vector3(), d1: new THREE.Vector3() }),
+    [],
+  );
   const reduced = useMemo(() => matchMedia("(prefers-reduced-motion: reduce)").matches, []);
   useEffect(() => {
     const on = (e: PointerEvent) => st.aim.set((e.clientX / innerWidth) * 2 - 1, (e.clientY / innerHeight) * 2 - 1);
@@ -94,14 +112,26 @@ function CameraRig({ chapter, sides, truckState }: { chapter: P; sides: number[]
     const { pos: tp, deg } = truckState.current;
     const [p0, l0, fov0] = SHOTS[i](tp, deg, t);
     const [p1, l1, fov1] = SHOTS[i + 1](tp, deg, t);
-    // Fly round the ring rather than straight across it: blend angle, radius and height about the
-    // centre, and rise in proportion to the distance covered so the path clears the buildings.
-    const a0 = Math.atan2(-p0.z, p0.x);
-    const a = a0 + turn(a0, Math.atan2(-p1.z, p1.x)) * k;
-    const r = THREE.MathUtils.lerp(Math.hypot(p0.x, p0.z), Math.hypot(p1.x, p1.z), k);
-    const lift = Math.sin(Math.PI * k) * Math.min(22, p0.distanceTo(p1) * 0.22);
-    tmp.p.set(r * Math.cos(a), THREE.MathUtils.lerp(p0.y, p1.y, k) + lift, -r * Math.sin(a));
-    tmp.l.copy(l0).lerp(l1, k);
+    // Fly round the ring rather than straight across it, and rise in proportion to the distance
+    // covered so the path clears the buildings. The look-at point travels round the ring too, so the
+    // view pans along the buildings instead of whipping across the tower in the middle.
+    const mid = Math.sin(Math.PI * k);
+    const lift = mid * Math.min(22, p0.distanceTo(p1) * 0.22);
+    orbit(p0, p1, k, tmp.p).y += lift;
+    // Turn the view from one shot's direction to the next like a tripod head, panning (yaw) and
+    // tilting (pitch) separately, rather than sliding a target point about: the camera never tilts
+    // further than either shot does, and a half-turn pans level instead of tumbling over the top.
+    tmp.d0.subVectors(l0, p0);
+    tmp.d1.subVectors(l1, p1);
+    const reach = THREE.MathUtils.lerp(tmp.d0.length(), tmp.d1.length(), k);
+    tmp.d0.normalize();
+    tmp.d1.normalize();
+    const y0 = Math.atan2(tmp.d0.x, tmp.d0.z);
+    const yaw = y0 + turn(y0, Math.atan2(tmp.d1.x, tmp.d1.z)) * k;
+    const pitch = THREE.MathUtils.lerp(Math.asin(tmp.d0.y), Math.asin(tmp.d1.y), k);
+    tmp.l.set(Math.cos(pitch) * Math.sin(yaw), Math.sin(pitch), Math.cos(pitch) * Math.cos(yaw)).multiplyScalar(reach).add(tmp.p);
+    // Between two checkpoints, watch the hauler drive from one to the next on the way.
+    if (i >= 1 && i <= 5) tmp.l.lerp(tmp.right.copy(tp).setY(2.5), mid * 0.75);
     // Portrait screens see less width: back off along the view line.
     const aspect = size.width / size.height;
     if (aspect < 1.2) tmp.p.sub(tmp.l).multiplyScalar(Math.min(2, 1.15 / aspect)).add(tmp.l);

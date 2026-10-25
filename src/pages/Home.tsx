@@ -148,7 +148,6 @@ export default function Home() {
           <img src="/icon.svg" className="h-9 w-9" alt="" />
           <span className="font-display text-xl font-semibold">UniGenome</span>
           <nav className="ml-auto flex gap-1 text-sm">
-            <Link to="/dsa" className="rounded-lg px-3 py-1.5 text-mute hover:text-ink">DSA</Link>
             <a href="#portals" className="lg-pill rounded-lg px-3 py-1.5 font-medium">Open a portal</a>
           </nav>
         </div>
@@ -277,12 +276,6 @@ function Portals() {
               <div className="mt-3 text-sm font-medium opacity-70 group-hover:opacity-100">Open →</div>
             </Link>
           ))}
-          <Link to="/dsa" className="glass group rounded-2xl p-5 transition hover:-translate-y-1">
-            <div className="text-3xl">🧮</div>
-            <div className="mt-2 font-display text-xl font-semibold text-sea">DSA, live</div>
-            <p className="mt-1 text-sm text-mute">Every data structure and algorithm in the app, drawn from its real data, with the file and function for each.</p>
-            <div className="mt-3 text-sm font-medium opacity-70 group-hover:opacity-100">Open →</div>
-          </Link>
         </div>
         <div className="glass mt-8 rounded-2xl p-5">
           <div className="flex flex-wrap items-center gap-3">

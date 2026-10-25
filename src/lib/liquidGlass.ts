@@ -93,7 +93,7 @@ function apply(el: HTMLElement) {
   if (w < 16 || h < 16) return;
   const r = Math.min(Math.round(parseFloat(getComputedStyle(el).borderTopLeftRadius) || 0), w / 2, h / 2);
   const id = filterFor(w, h, r);
-  const value = `url(#${id}) saturate(165%) brightness(1.06)`;
+  const value = `url(#${id}) blur(var(--lg-blur, 14px)) saturate(165%) brightness(1.06)`;
   if (el.style.backdropFilter !== value) el.style.backdropFilter = value;
 }
 

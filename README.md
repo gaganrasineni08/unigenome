@@ -3,7 +3,6 @@
 Anti-counterfeit tracking for any product. Each item gets a signed QR identity. Every scan along the supply chain (factory, warehouse, shop) is signed and records where and when it happened. One QR on a carton or pallet stands for everything inside it. A buyer scans the product to see whether it is genuine and its whole journey, and can raise a complaint.
 
 - **Portals:** Manufacturer (and quality approver), Warehouse, Retailer, Buyer, Regulator, each with its own screen.
-- **DSA, live:** `/dsa` shows all 13 data structures and algorithms running on the app's real data.
 - **Code walkthrough:** [docs/DSA-CODE-WALKTHROUGH.md](docs/DSA-CODE-WALKTHROUGH.md) explains each topic with the exact code.
 - **Feature walkthrough:** [docs/FEATURE-WALKTHROUGH.md](docs/FEATURE-WALKTHROUGH.md) takes each feature (for example "a copied QR gets flagged") line by line through the code, with the DSA topic at each step. In VS Code, install the CodeTour extension to step through the same thing inside the editor.
 

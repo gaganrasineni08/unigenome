@@ -32,7 +32,7 @@ body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
 }
-/* Liquid glass: clear panels that bend what is behind them, with a bright rim and no frosted blur.
+/* Liquid glass: panels that bend and soften what is behind them (a Gaussian blur, --lg-blur), with a bright rim.
    The refraction itself is an SVG displacement filter built per panel size by src/lib/liquidGlass.ts
    (Chromium only); other browsers keep the clear tint, rim and highlight below. In @layer components
    so Tailwind utilities (absolute, sticky, rounded-*) still win. */
@@ -50,8 +50,9 @@ body {
       inset 0 -1px 0 rgba(255, 255, 255, 0.1),
       inset 0 0 22px rgba(255, 255, 255, 0.045),
       0 18px 48px -18px rgba(0, 0, 0, 0.6);
-    -webkit-backdrop-filter: saturate(165%) brightness(1.06);
-    backdrop-filter: saturate(165%) brightness(1.06);
+    --lg-blur: 14px;
+    -webkit-backdrop-filter: blur(var(--lg-blur)) saturate(165%) brightness(1.06);
+    backdrop-filter: blur(var(--lg-blur)) saturate(165%) brightness(1.06);
   }
   /* the specular rim: bright at the top-left and bottom-right corners, as on curved glass */
   .glass::before {
@@ -66,14 +67,15 @@ body {
     mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
     pointer-events: none;
   }
-  /* panels over the busy 3D scene get a deeper tint so their text stays readable */
-  .glass-strong { background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)), rgba(2, 10, 16, 0.5); }
+  /* panels over the busy, brightly lit 3D scene get a heavier blur and a deeper tint so their text stays readable */
+  .glass-strong { --lg-blur: 22px; background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)), rgba(2, 10, 16, 0.58); }
   .lg-bar {
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.01)), rgba(1, 14, 18, 0.45);
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.05), 0 10px 30px -18px rgba(0, 0, 0, 0.7);
-    -webkit-backdrop-filter: saturate(170%) brightness(1.05);
-    backdrop-filter: saturate(170%) brightness(1.05);
+    --lg-blur: 18px;
+    -webkit-backdrop-filter: blur(var(--lg-blur)) saturate(170%) brightness(1.05);
+    backdrop-filter: blur(var(--lg-blur)) saturate(170%) brightness(1.05);
   }
   .lg-pill {
     background: rgba(255, 255, 255, 0.08);
@@ -87,8 +89,8 @@ body {
     border-radius: 999px;
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.04)), rgba(4, 12, 18, 0.35);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), inset 0 0 0 1px color-mix(in srgb, var(--chip) 55%, transparent), 0 0 24px -4px color-mix(in srgb, var(--chip) 70%, transparent);
-    -webkit-backdrop-filter: saturate(170%) brightness(1.1);
-    backdrop-filter: saturate(170%) brightness(1.1);
+    -webkit-backdrop-filter: blur(8px) saturate(170%) brightness(1.1);
+    backdrop-filter: blur(8px) saturate(170%) brightness(1.1);
   }
   .lg-tag { padding: 4px 12px; font: 600 12px/1.4 var(--font-sans); letter-spacing: 0.14em; text-transform: uppercase; color: var(--chip); }
   .lg-chip {
