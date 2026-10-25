@@ -23,6 +23,7 @@ OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "publ
 R_ROAD = 32.0  # centre line of the road
 ROAD_W = 9.0
 R_CHECK = 48.0  # where the checkpoint buildings stand
+NEON_SCALE = 0.45  # one knob for the brightness of every neon part
 # Checkpoint angles in degrees; the hauler drives anticlockwise, so it meets them in this order.
 CHECKPOINTS = {"factory": 210, "warehouse": 300, "retailer": 30, "buyer": 120}
 
@@ -65,7 +66,8 @@ def mat(name, color=(0.1, 0.1, 0.1), rough=0.6, metal=0.0, emit=None, strength=0
 
 
 def neon(name, c, s=6.0):
-    return mat("neon_" + name, color=c, rough=0.3, emit=c, strength=s)
+    # Strengths are tuned for the page's bloom: about 1 glows softly, 3 and up blooms hard.
+    return mat("neon_" + name, color=c, rough=0.3, emit=c, strength=s * NEON_SCALE)
 
 
 HULL = mat("hull", (0.05, 0.06, 0.08), rough=0.35, metal=0.85)
@@ -74,7 +76,7 @@ CONCRETE = mat("concrete", (0.09, 0.1, 0.12), rough=0.85)
 ASPHALT = mat("asphalt", (0.025, 0.028, 0.035), rough=0.55, metal=0.2)
 GLASS = mat("glass_dark", (0.02, 0.05, 0.08), rough=0.05, metal=0.6)
 RUBBER = mat("rubber", (0.02, 0.02, 0.02), rough=0.9)
-CARDBOARD = mat("cardboard", (0.62, 0.44, 0.25), rough=0.8)
+CARDBOARD = mat("cardboard", (0.72, 0.38, 0.14), rough=0.75)
 
 # ------------------------------------------------------------------ mesh helpers
 
@@ -246,8 +248,8 @@ def build_factory(g):
             bm.faces.new([v[k] for k in f])
         bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
         p.append(from_bmesh(f"f_saw{i}", bm, HULL_LIGHT, loc=(1, 0, 7.6)))
-        p.append(box(f"f_sawglow{i}", (11.6, 0.1, 2.3), (1, y + 1.75, 8.9), neon("warm", COL["warm"], 4)))
-    windows_row("f_win", -5.05, -8, 8, 4.2, 6, (2.0, 2.6), neon("warm", COL["warm"], 4), p)
+        p.append(box(f"f_sawglow{i}", (11.6, 0.1, 2.3), (1, y + 1.75, 8.9), neon("warm", COL["warm"], 2.2)))
+    windows_row("f_win", -5.05, -8, 8, 4.2, 6, (2.0, 2.6), neon("warm", COL["warm"], 2.2), p)
     p.append(box("f_band", (0.1, 18.2, 0.35), (-5.1, 0, 6.6), neon("mint", c, 8)))
     # chimneys with glowing rings
     for k, (y, h) in enumerate(((5.5, 20), (8.2, 16))):
@@ -272,7 +274,7 @@ def build_warehouse(g):
     bmesh.ops.create_cone(bm, cap_ends=True, segments=48, radius1=6.5, radius2=6.5, depth=22)
     bmesh.ops.bisect_plane(bm, geom=bm.verts[:] + bm.edges[:] + bm.faces[:], plane_co=(0, 0, 0), plane_no=(1, 0, 0), clear_inner=True)
     bmesh.ops.contextual_create(bm, geom=[e for e in bm.edges if e.is_boundary])
-    p.append(from_bmesh("w_roof", bm, HULL_LIGHT, loc=(1.5, 0, 5.6), rot=(math.radians(90), math.radians(-90), 0), smooth=True))
+    p.append(from_bmesh("w_roof", bm, HULL_LIGHT, loc=(1.5, 0, 5.6), rot=(0, math.radians(-90), math.radians(90)), smooth=True))
     # roof light strips following the arc
     for y in (-10.9, 10.9):
         p.append(torus(f"w_arc{y:.0f}", 6.55, 0.1, (1.5, y, 5.6), neon("sea", c, 8), rot=(math.radians(90), 0, 0), seg=64, rseg=6))
@@ -308,7 +310,7 @@ def build_retailer(g):
     p.append(box("r_sign_glow2", (0.12, 9, 1.8), (1.35, 0, 8.2), neon("amber", c, 9)))
     # shelves visible inside
     for i in range(3):
-        p.append(box(f"r_shelf{i}", (0.6, 10.5, 0.12), (-2.8, 0, 1.4 + i * 1.0), neon("warm", COL["warm"], 4)))
+        p.append(box(f"r_shelf{i}", (0.6, 10.5, 0.12), (-2.8, 0, 1.4 + i * 1.0), neon("warm", COL["warm"], 2.2)))
     join("Retailer_mesh", p).parent = g
     # the spinning logo cube above the shop (animated on the page)
     cube = box("Retailer_spin", (2.2, 2.2, 2.2), (1, 0, 12.2), neon("amber_cube", c, 4), parent=g, bevel=0.25)
@@ -403,7 +405,7 @@ def skyline_material():
     p.inputs["Roughness"].default_value = 0.4
     p.inputs["Metallic"].default_value = 0.6
     nt.links.new(tex.outputs["Color"], p.inputs["Emission Color"])
-    p.inputs["Emission Strength"].default_value = 2.2
+    p.inputs["Emission Strength"].default_value = 1.3
     return m
 
 
@@ -413,13 +415,13 @@ def build_skyline():
     uv = bm.loops.layers.uv.new()
     n = 0
     tries = 0
-    while n < 170 and tries < 2000:
+    while n < 220 and tries < 3000:
         tries += 1
-        r = random.uniform(78, 165)
+        r = random.uniform(100, 215)
         deg = random.uniform(0, 360)
         w = random.uniform(5, 11)
         d = random.uniform(5, 11)
-        h = random.uniform(8, 26) * (1.0 + (r - 78) / 70)
+        h = random.uniform(10, 30) * (1.0 + (r - 100) / 110)
         if random.random() < 0.08:
             h *= 1.8
         cx, cy, _ = polar(r, deg)

@@ -108,7 +108,7 @@ export const PORTALS = {
 
 export function TopBar({ title, color, tabs, right }: { title: string; color: string; tabs?: Array<{ to: string; label: string; end?: boolean }>; right?: ReactNode }) {
   return (
-    <header className="no-print sticky top-0 z-30 border-b border-white/5 bg-abyss/75 backdrop-blur-xl">
+    <header className="lg-bar no-print sticky top-0 z-30">
       <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3">
         <Link to="/" className="flex items-center gap-2">
           <img src="/icon.svg" className="h-8 w-8" alt="" />

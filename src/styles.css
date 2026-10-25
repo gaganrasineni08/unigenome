@@ -22,18 +22,88 @@
 html, body, #root { min-height: 100%; }
 body {
   margin: 0;
-  background: radial-gradient(1200px 600px at 80% -10%, #034349 0%, transparent 60%), radial-gradient(900px 500px at -10% 110%, #023a3b 0%, transparent 55%), var(--color-deep);
+  background:
+    radial-gradient(rgba(160, 255, 230, 0.07) 1px, transparent 1.6px) 0 0 / 22px 22px,
+    radial-gradient(700px 420px at 85% 8%, rgba(2, 195, 154, 0.16) 0%, transparent 70%),
+    radial-gradient(600px 400px at 8% 92%, rgba(79, 195, 247, 0.12) 0%, transparent 70%),
+    radial-gradient(1200px 600px at 80% -10%, #034349 0%, transparent 60%), radial-gradient(900px 500px at -10% 110%, #023a3b 0%, transparent 55%), var(--color-deep);
   background-attachment: fixed;
   color: var(--color-ink);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
 }
-.glass {
-  background: linear-gradient(180deg, rgba(10, 60, 64, 0.72), rgba(4, 36, 40, 0.72));
-  border: 1px solid rgba(2, 195, 154, 0.16);
-  box-shadow: 0 10px 40px -12px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.04);
-  backdrop-filter: blur(14px);
+/* Liquid glass: clear panels that bend what is behind them, with a bright rim and no frosted blur.
+   The refraction itself is an SVG displacement filter built per panel size by src/lib/liquidGlass.ts
+   (Chromium only); other browsers keep the clear tint, rim and highlight below. In @layer components
+   so Tailwind utilities (absolute, sticky, rounded-*) still win. */
+@layer components {
+  .glass {
+    position: relative;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.075) 0%, rgba(255, 255, 255, 0.015) 42%, rgba(255, 255, 255, 0.035) 100%),
+      rgba(3, 26, 30, 0.34);
+    border: 1px solid rgba(255, 255, 255, 0.13);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.38),
+      inset 1px 0 0 rgba(255, 255, 255, 0.12),
+      inset -1px 0 0 rgba(255, 255, 255, 0.06),
+      inset 0 -1px 0 rgba(255, 255, 255, 0.1),
+      inset 0 0 22px rgba(255, 255, 255, 0.045),
+      0 18px 48px -18px rgba(0, 0, 0, 0.6);
+    -webkit-backdrop-filter: saturate(165%) brightness(1.06);
+    backdrop-filter: saturate(165%) brightness(1.06);
+  }
+  /* the specular rim: bright at the top-left and bottom-right corners, as on curved glass */
+  .glass::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0.05) 28%, rgba(255, 255, 255, 0) 60%, rgba(255, 255, 255, 0.28));
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+    pointer-events: none;
+  }
+  /* panels over the busy 3D scene get a deeper tint so their text stays readable */
+  .glass-strong { background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)), rgba(2, 10, 16, 0.5); }
+  .lg-bar {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.01)), rgba(1, 14, 18, 0.45);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.05), 0 10px 30px -18px rgba(0, 0, 0, 0.7);
+    -webkit-backdrop-filter: saturate(170%) brightness(1.05);
+    backdrop-filter: saturate(170%) brightness(1.05);
+  }
+  .lg-pill {
+    background: rgba(255, 255, 255, 0.08);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+  }
+  .lg-pill:hover { background: rgba(255, 255, 255, 0.14); }
+  /* labels floating in the 3D scene */
+  .lg-tag, .lg-chip {
+    white-space: nowrap;
+    color: #fff;
+    border-radius: 999px;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0.04)), rgba(4, 12, 18, 0.35);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), inset 0 0 0 1px color-mix(in srgb, var(--chip) 55%, transparent), 0 0 24px -4px color-mix(in srgb, var(--chip) 70%, transparent);
+    -webkit-backdrop-filter: saturate(170%) brightness(1.1);
+    backdrop-filter: saturate(170%) brightness(1.1);
+  }
+  .lg-tag { padding: 4px 12px; font: 600 12px/1.4 var(--font-sans); letter-spacing: 0.14em; text-transform: uppercase; color: var(--chip); }
+  .lg-chip {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 16px 8px 12px; border-radius: 16px;
+    opacity: 0; transform: translateY(8px) scale(0.92);
+    transition: opacity 0.35s, transform 0.45s cubic-bezier(0.2, 0.9, 0.2, 1.2);
+  }
+  .lg-chip.is-on { opacity: 1; transform: none; }
+  .lg-chip-dot { width: 10px; height: 10px; border-radius: 99px; background: var(--chip); box-shadow: 0 0 12px var(--chip); }
+  .lg-chip-title { font: 600 14px/1.3 var(--font-sans); }
+  .lg-chip-sub { font: 400 12px/1.3 var(--font-sans); color: #c7d4dc; }
 }
+:focus-visible { outline: 2px solid var(--color-mint); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } .lg-chip { transition: none; } }
 .mono { font-family: var(--font-mono); }
 .leaflet-container { background: #0b2b2e; border-radius: 16px; }
 .leaflet-tile { filter: saturate(0.6) brightness(0.85) hue-rotate(150deg) invert(0.92) contrast(0.9); }
