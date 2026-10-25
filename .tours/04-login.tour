@@ -1,0 +1,56 @@
+{
+  "$schema": "https://aka.ms/codetour-schema",
+  "title": "04 · Signing in without sending a password",
+  "description": "Sign in as any company with passphrase `demo1234`. The passphrase never leaves the browser.",
+  "steps": [
+    {
+      "title": "How to show it",
+      "description": "## Signing in without sending a password\n\n**How to show it in the app**\n\nSign in as any company with passphrase `demo1234`. The passphrase never leaves the browser."
+    },
+    {
+      "file": "server/app.ts",
+      "selection": {
+        "start": {
+          "line": 115,
+          "character": 1
+        },
+        "end": {
+          "line": 123,
+          "character": 4
+        }
+      },
+      "title": "Step 1: the server sends a one-time challenge",
+      "description": "### Step 1: the server sends a one-time challenge\n\nThe server returns the encrypted private key and a random **nonce** that expires in 2 minutes."
+    },
+    {
+      "file": "src/lib/session.tsx",
+      "selection": {
+        "start": {
+          "line": 77,
+          "character": 1
+        },
+        "end": {
+          "line": 86,
+          "character": 129
+        }
+      },
+      "title": "Step 2: the browser unlocks the key and signs the challenge",
+      "description": "### Step 2: the browser unlocks the key and signs the challenge\n\n**DSA topic:** 2. Digital signatures (Ed25519)\n\nOnly the right passphrase decrypts the key. The browser then **signs the nonce** with it."
+    },
+    {
+      "file": "server/app.ts",
+      "selection": {
+        "start": {
+          "line": 126,
+          "character": 1
+        },
+        "end": {
+          "line": 135,
+          "character": 112
+        }
+      },
+      "title": "Step 3: the server checks the signature",
+      "description": "### Step 3: the server checks the signature\n\n**DSA topic:** 2. Digital signatures (Ed25519), 3. Hash map / hash set\n\nThe nonce is deleted as it is used, so it cannot be replayed. The public key comes from the `ix.parties` **hash map**, and the signature must verify."
+    }
+  ]
+}

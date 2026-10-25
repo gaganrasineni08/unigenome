@@ -1,0 +1,56 @@
+{
+  "$schema": "https://aka.ms/codetour-schema",
+  "title": "15 · The in-memory data structures behind the server",
+  "description": "DSA page → Hash map tab shows the buckets live.",
+  "steps": [
+    {
+      "title": "How to show it",
+      "description": "## The in-memory data structures behind the server\n\n**How to show it in the app**\n\nDSA page → Hash map tab shows the buckets live."
+    },
+    {
+      "file": "server/indexes.ts",
+      "selection": {
+        "start": {
+          "line": 24,
+          "character": 1
+        },
+        "end": {
+          "line": 30,
+          "character": 2
+        }
+      },
+      "title": "What is kept in memory",
+      "description": "### What is kept in memory\n\n**DSA topic:** 3. Hash map / hash set, 11. Trie, 12. AVL tree\n\nBuilt from the database when the server starts, then updated on every write."
+    },
+    {
+      "file": "shared/dsa/hashmap.ts",
+      "selection": {
+        "start": {
+          "line": 5,
+          "character": 1
+        },
+        "end": {
+          "line": 12,
+          "character": 2
+        }
+      },
+      "title": "The hash function",
+      "description": "### The hash function\n\n**DSA topic:** 3. Hash map / hash set\n\nFNV-1a turns an id into a bucket number."
+    },
+    {
+      "file": "shared/dsa/hashmap.ts",
+      "selection": {
+        "start": {
+          "line": 44,
+          "character": 1
+        },
+        "end": {
+          "line": 55,
+          "character": 4
+        }
+      },
+      "title": "Insert with chaining, and doubling",
+      "description": "### Insert with chaining, and doubling\n\n**DSA topic:** 3. Hash map / hash set\n\nCollisions go into the same bucket's list. When the load factor passes 0.75 the table doubles, so lookups stay O(1) on average."
+    }
+  ]
+}

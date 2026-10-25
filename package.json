@@ -11,7 +11,8 @@
     "start": "NODE_ENV=production tsx server/node.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p .",
-    "seed": "tsx server/seed-cli.ts --reset"
+    "seed": "tsx server/seed-cli.ts --reset",
+    "walkthrough": "node scripts/walkthrough.mjs"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.11",

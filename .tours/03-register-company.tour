@@ -1,0 +1,101 @@
+{
+  "$schema": "https://aka.ms/codetour-schema",
+  "title": "03 · A new company registers, and the regulator approves it",
+  "description": "Register → pick Manufacturer, Warehouse or Retailer → fill in the company details and attach a certificate.\nThe new account waits. Sign in as `regulator` → New companies → see the automatic checks and the document → approve or reject.\nThe seeded **Fast Pharma Distributors** has a wrong GSTIN check digit and a licence number already used by another company, so its checks show red.",
+  "steps": [
+    {
+      "title": "How to show it",
+      "description": "## A new company registers, and the regulator approves it\n\n**How to show it in the app**\n\nRegister → pick Manufacturer, Warehouse or Retailer → fill in the company details and attach a certificate.\nThe new account waits. Sign in as `regulator` → New companies → see the automatic checks and the document → approve or reject.\nThe seeded **Fast Pharma Distributors** has a wrong GSTIN check digit and a licence number already used by another company, so its checks show red."
+    },
+    {
+      "file": "src/pages/Register.tsx",
+      "selection": {
+        "start": {
+          "line": 55,
+          "character": 1
+        },
+        "end": {
+          "line": 59,
+          "character": 400
+        }
+      },
+      "title": "Keys are made in the browser",
+      "description": "### Keys are made in the browser\n\n**DSA topic:** 2. Digital signatures (Ed25519)\n\nThe company's **Ed25519 key pair** is created on its own computer. The private key is encrypted with the passphrase *before* it is sent, so the server never sees it."
+    },
+    {
+      "file": "shared/keystore.ts",
+      "selection": {
+        "start": {
+          "line": 26,
+          "character": 1
+        },
+        "end": {
+          "line": 33,
+          "character": 2
+        }
+      },
+      "title": "Encrypting the private key with the passphrase",
+      "description": "### Encrypting the private key with the passphrase\n\n**DSA topic:** 1. SHA-256 hashing\n\nThe passphrase is stretched with **PBKDF2 (SHA-256, 200,000 rounds)** into an AES key. This makes guessing passphrases slow."
+    },
+    {
+      "file": "server/app.ts",
+      "selection": {
+        "start": {
+          "line": 59,
+          "character": 1
+        },
+        "end": {
+          "line": 83,
+          "character": 4
+        }
+      },
+      "title": "The server stores the new company as 'pending'",
+      "description": "### The server stores the new company as 'pending'\n\n**DSA topic:** 3. Hash map / hash set\n\nThe account starts as **pending**: it cannot sign batches, dispatch or receive until approved.\nThe company is also added to the `ix.parties` **hash map**, so its key can be found in O(1) later."
+    },
+    {
+      "file": "shared/gstin.ts",
+      "selection": {
+        "start": {
+          "line": 8,
+          "character": 1
+        },
+        "end": {
+          "line": 15,
+          "character": 2
+        }
+      },
+      "title": "Checking the GSTIN check digit",
+      "description": "### Checking the GSTIN check digit\n\nThe last character of a GSTIN is a **check digit** computed from the first 14 (a mod-36 weighted sum). A typo or a made-up GSTIN almost always fails this."
+    },
+    {
+      "file": "server/app.ts",
+      "selection": {
+        "start": {
+          "line": 186,
+          "character": 1
+        },
+        "end": {
+          "line": 196,
+          "character": 106
+        }
+      },
+      "title": "Automatic checks shown to the regulator",
+      "description": "### Automatic checks shown to the regulator\n\nFor each pending company the server runs: the GSTIN check digit, whether another company already uses this licence number, whether another uses this GSTIN, and whether a document is attached."
+    },
+    {
+      "file": "server/app.ts",
+      "selection": {
+        "start": {
+          "line": 213,
+          "character": 1
+        },
+        "end": {
+          "line": 227,
+          "character": 31
+        }
+      },
+      "title": "Approving = signing the company's key",
+      "description": "### Approving = signing the company's key\n\n**DSA topic:** 2. Digital signatures (Ed25519), 3. Hash map / hash set\n\nThe regulator **signs** the new company's id, role and public key (`UG/endorse`). Anyone can check later who vouched for this company.\nThe status changes to approved in the database and in the **hash map**."
+    }
+  ]
+}

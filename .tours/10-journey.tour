@@ -1,0 +1,71 @@
+{
+  "$schema": "https://aka.ms/codetour-schema",
+  "title": "10 · The buyer sees the full journey of the item",
+  "description": "Open any sold item's QR link: the timeline shows factory → warehouse → shop, including what happened to its carton.",
+  "steps": [
+    {
+      "title": "How to show it",
+      "description": "## The buyer sees the full journey of the item\n\n**How to show it in the app**\n\nOpen any sold item's QR link: the timeline shows factory → warehouse → shop, including what happened to its carton."
+    },
+    {
+      "file": "server/logic.ts",
+      "selection": {
+        "start": {
+          "line": 104,
+          "character": 1
+        },
+        "end": {
+          "line": 116,
+          "character": 73
+        }
+      },
+      "title": "Collect the item's records and its cartons' records",
+      "description": "### Collect the item's records and its cartons' records\n\n**DSA topic:** 6. Tree + DFS\n\nWhile an item was inside a carton, the carton's scans count for the item too. This collects one sorted list per container."
+    },
+    {
+      "file": "server/logic.ts",
+      "selection": {
+        "start": {
+          "line": 120,
+          "character": 1
+        },
+        "end": {
+          "line": 120,
+          "character": 88
+        }
+      },
+      "title": "Merge them in time order with a heap",
+      "description": "### Merge them in time order with a heap\n\n**DSA topic:** 9. Binary heap (priority queue)\n\n**k-way merge**: put the first record of each list in a min-**heap**, repeatedly take the earliest. O(N log k)."
+    },
+    {
+      "file": "shared/dsa/heap.ts",
+      "selection": {
+        "start": {
+          "line": 57,
+          "character": 1
+        },
+        "end": {
+          "line": 67,
+          "character": 2
+        }
+      },
+      "title": "k-way merge code",
+      "description": "### k-way merge code\n\n**DSA topic:** 9. Binary heap (priority queue)\n\nEach list contributes its next record when its current one is taken."
+    },
+    {
+      "file": "shared/events.ts",
+      "selection": {
+        "start": {
+          "line": 48,
+          "character": 1
+        },
+        "end": {
+          "line": 59,
+          "character": 2
+        }
+      },
+      "title": "Proving the history was not changed",
+      "description": "### Proving the history was not changed\n\n**DSA topic:** 4. Hash chain (linked list by hashes), 2. Digital signatures (Ed25519)\n\nWalk the chain from the first record: each `prev` must equal the previous hash, each hash must be recomputed exactly, and each signature must verify. O(k). The DSA page lets you tamper with a record and watch this fail."
+    }
+  ]
+}

@@ -138,7 +138,6 @@ export function ScanAct({ allowed }: { allowed: Action[] }) {
                   </p>
                 )}
                 {result.transitHours != null && <p className="mt-3 text-sm">Transit time: <b>{fmtHours(result.transitHours)}</b></p>}
-                {result.diverted && <Alert tone="amber">This shipment was addressed to someone else. An alert was raised.</Alert>}
                 {result.flags?.length > 0 && <div className="mt-2"><Alert tone="amber">⚑ {result.flags.join("; ")}</Alert></div>}
                 {result.spotCheck && (
                   <div className="mt-4">

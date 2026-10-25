@@ -1,0 +1,71 @@
+{
+  "$schema": "https://aka.ms/codetour-schema",
+  "title": "09 · Opening a carton and the random spot check",
+  "description": "Retailer → Scan → scan a received carton → Open carton. The server picks a few items to check; scan them.",
+  "steps": [
+    {
+      "title": "How to show it",
+      "description": "## Opening a carton and the random spot check\n\n**How to show it in the app**\n\nRetailer → Scan → scan a received carton → Open carton. The server picks a few items to check; scan them."
+    },
+    {
+      "file": "server/app.ts",
+      "selection": {
+        "start": {
+          "line": 524,
+          "character": 1
+        },
+        "end": {
+          "line": 543,
+          "character": 13
+        }
+      },
+      "title": "Opening: items go on the shelf, and the server picks random items",
+      "description": "### Opening: items go on the shelf, and the server picks random items\n\n**DSA topic:** 5. Merkle tree\n\nAbout 10% of the items are chosen at random **by the server**, so no one knows in advance which ones will be checked. Each comes with its **Merkle proof**."
+    },
+    {
+      "file": "shared/dsa/merkle.ts",
+      "selection": {
+        "start": {
+          "line": 30,
+          "character": 1
+        },
+        "end": {
+          "line": 48,
+          "character": 2
+        }
+      },
+      "title": "Merkle proof: proving one item was in the carton",
+      "description": "### Merkle proof: proving one item was in the carton\n\n**DSA topic:** 5. Merkle tree\n\nThe proof is just the sibling hash at each level: O(log n) hashes. Hashing up from the item must reach the signed root."
+    },
+    {
+      "file": "src/components/ScanAct.tsx",
+      "selection": {
+        "start": {
+          "line": 98,
+          "character": 1
+        },
+        "end": {
+          "line": 98,
+          "character": 78
+        }
+      },
+      "title": "The retailer's browser checks the proof",
+      "description": "### The retailer's browser checks the proof\n\n**DSA topic:** 5. Merkle tree\n\nIf someone swapped a real item for a fake, its proof will not reach the root."
+    },
+    {
+      "file": "server/app.ts",
+      "selection": {
+        "start": {
+          "line": 551,
+          "character": 1
+        },
+        "end": {
+          "line": 551,
+          "character": 171
+        }
+      },
+      "title": "A swapped item raises the most severe alert",
+      "description": "### A swapped item raises the most severe alert\n\n**DSA topic:** 9. Binary heap (priority queue)\n\nSeverity 5 puts it at the top of the alert heap."
+    }
+  ]
+}

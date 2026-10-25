@@ -1,0 +1,101 @@
+{
+  "$schema": "https://aka.ms/codetour-schema",
+  "title": "08 · Only the chosen company can receive (and one scan updates all items)",
+  "description": "Sign in as a retailer the carton was **not** sent to and scan it: 'This belongs to another company's shipment.'\nSign in as the right company and scan it: the Receive button appears, and all items inside move with it.",
+  "steps": [
+    {
+      "title": "How to show it",
+      "description": "## Only the chosen company can receive (and one scan updates all items)\n\n**How to show it in the app**\n\nSign in as a retailer the carton was **not** sent to and scan it: 'This belongs to another company's shipment.'\nSign in as the right company and scan it: the Receive button appears, and all items inside move with it."
+    },
+    {
+      "file": "server/app.ts",
+      "selection": {
+        "start": {
+          "line": 634,
+          "character": 1
+        },
+        "end": {
+          "line": 641,
+          "character": 4
+        }
+      },
+      "title": "Other companies can't even see the shipment",
+      "description": "### Other companies can't even see the shipment\n\n**DSA topic:** 6. Tree + DFS\n\nA company sees a unit only if it is involved: it holds it, the shipment is addressed to it, or it appears in the history. Everyone else gets only the id."
+    },
+    {
+      "file": "src/components/ScanAct.tsx",
+      "selection": {
+        "start": {
+          "line": 59,
+          "character": 1
+        },
+        "end": {
+          "line": 59,
+          "character": 79
+        }
+      },
+      "title": "The Receive button shows only for the destination",
+      "description": "### The Receive button shows only for the destination\n\nThe button appears only when the shipment's destination is the company that is signed in."
+    },
+    {
+      "file": "server/app.ts",
+      "selection": {
+        "start": {
+          "line": 498,
+          "character": 1
+        },
+        "end": {
+          "line": 501,
+          "character": 8
+        }
+      },
+      "title": "The server enforces it, and reports attempts",
+      "description": "### The server enforces it, and reports attempts\n\n**DSA topic:** 9. Binary heap (priority queue)\n\nEven if someone calls the API directly, the server refuses with 403 and raises a severity-4 'diverted' alert."
+    },
+    {
+      "file": "server/logic.ts",
+      "selection": {
+        "start": {
+          "line": 46,
+          "character": 1
+        },
+        "end": {
+          "line": 66,
+          "character": 2
+        }
+      },
+      "title": "One carton scan updates every item: DFS of the packaging tree",
+      "description": "### One carton scan updates every item: DFS of the packaging tree\n\n**DSA topic:** 6. Tree + DFS\n\nItems don't need their own scan. Their holder is the holder of their **top container** (`topOf` walks up parent pointers). `subtree` collects every carton and item below a pallet with an iterative **DFS**."
+    },
+    {
+      "file": "shared/dsa/tree.ts",
+      "selection": {
+        "start": {
+          "line": 4,
+          "character": 1
+        },
+        "end": {
+          "line": 14,
+          "character": 2
+        }
+      },
+      "title": "Depth-first search with a stack",
+      "description": "### Depth-first search with a stack\n\n**DSA topic:** 6. Tree + DFS\n\nPop a unit, record it, push its children. Every unit below the root is visited once: O(n)."
+    },
+    {
+      "file": "server/app.ts",
+      "selection": {
+        "start": {
+          "line": 568,
+          "character": 1
+        },
+        "end": {
+          "line": 568,
+          "character": 140
+        }
+      },
+      "title": "Every item's last location is updated",
+      "description": "### Every item's last location is updated\n\n**DSA topic:** 6. Tree + DFS, 3. Hash map / hash set\n\nThe location of this carton scan is copied to every unit inside it, so clone detection works for each item too."
+    }
+  ]
+}

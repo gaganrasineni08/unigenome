@@ -1,0 +1,101 @@
+{
+  "$schema": "https://aka.ms/codetour-schema",
+  "title": "07 · Dispatching a carton to a chosen company",
+  "description": "Manufacturer → Scan → scan the carton → Dispatch → choose the warehouse. The expected arrival time appears.",
+  "steps": [
+    {
+      "title": "How to show it",
+      "description": "## Dispatching a carton to a chosen company\n\n**How to show it in the app**\n\nManufacturer → Scan → scan the carton → Dispatch → choose the warehouse. The expected arrival time appears."
+    },
+    {
+      "file": "src/lib/record.ts",
+      "selection": {
+        "start": {
+          "line": 20,
+          "character": 1
+        },
+        "end": {
+          "line": 35,
+          "character": 2
+        }
+      },
+      "title": "Every scan is a signed record linked to the previous one",
+      "description": "### Every scan is a signed record linked to the previous one\n\n**DSA topic:** 2. Digital signatures (Ed25519), 4. Hash chain (linked list by hashes)\n\nThe record holds who, what, when, where (GPS, snapped to the company's site) and `prev`: the **hash of the previous record** on this unit. Then it is **signed**."
+    },
+    {
+      "file": "server/app.ts",
+      "selection": {
+        "start": {
+          "line": 322,
+          "character": 1
+        },
+        "end": {
+          "line": 334,
+          "character": 2
+        }
+      },
+      "title": "Appending to the hash chain",
+      "description": "### Appending to the hash chain\n\n**DSA topic:** 4. Hash chain (linked list by hashes), 1. SHA-256 hashing\n\nThe server refuses the record if `prev` is not the current head of the chain. The new record's hash becomes the new head.\nChanging any old record would change its hash and break every link after it, so the history cannot be edited quietly."
+    },
+    {
+      "file": "server/app.ts",
+      "selection": {
+        "start": {
+          "line": 467,
+          "character": 1
+        },
+        "end": {
+          "line": 467,
+          "character": 83
+        }
+      },
+      "title": "GPS must match the registered site",
+      "description": "### GPS must match the registered site\n\n**DSA topic:** 13. Haversine distance + speed check\n\n**Haversine** distance from the company's registered site. More than 2 km away and the record is flagged."
+    },
+    {
+      "file": "server/app.ts",
+      "selection": {
+        "start": {
+          "line": 475,
+          "character": 1
+        },
+        "end": {
+          "line": 491,
+          "character": 13
+        }
+      },
+      "title": "Dispatch: only the holder, only to an approved company",
+      "description": "### Dispatch: only the holder, only to an approved company\n\n**DSA topic:** 8. Dijkstra's shortest path\n\nThe unit is marked as in transit **to that one company**. The expected arrival comes from `estimateArrival` (Dijkstra, next step)."
+    },
+    {
+      "file": "server/logic.ts",
+      "selection": {
+        "start": {
+          "line": 162,
+          "character": 1
+        },
+        "end": {
+          "line": 192,
+          "character": 2
+        }
+      },
+      "title": "Expected arrival with Dijkstra",
+      "description": "### Expected arrival with Dijkstra\n\n**DSA topic:** 8. Dijkstra's shortest path, 9. Binary heap (priority queue), 13. Haversine distance + speed check\n\nPast deliveries form a **weighted graph**: companies are nodes, and each edge's weight is the average hours a delivery took.\n**Dijkstra** (using a min-**heap**) finds the fastest known route. With no history yet, it falls back to haversine distance ÷ road speed."
+    },
+    {
+      "file": "shared/dsa/graph.ts",
+      "selection": {
+        "start": {
+          "line": 54,
+          "character": 1
+        },
+        "end": {
+          "line": 84,
+          "character": 2
+        }
+      },
+      "title": "Dijkstra's algorithm",
+      "description": "### Dijkstra's algorithm\n\n**DSA topic:** 8. Dijkstra's shortest path, 9. Binary heap (priority queue)\n\nAlways settle the closest unsettled node (taken from the heap), then relax its edges. O((V + E) log V)."
+    }
+  ]
+}

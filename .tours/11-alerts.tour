@@ -1,0 +1,41 @@
+{
+  "$schema": "https://aka.ms/codetour-schema",
+  "title": "11 · Alerts, most urgent first",
+  "description": "Regulator → Alerts: the list and the heap array behind it.",
+  "steps": [
+    {
+      "title": "How to show it",
+      "description": "## Alerts, most urgent first\n\n**How to show it in the app**\n\nRegulator → Alerts: the list and the heap array behind it."
+    },
+    {
+      "file": "server/logic.ts",
+      "selection": {
+        "start": {
+          "line": 229,
+          "character": 1
+        },
+        "end": {
+          "line": 238,
+          "character": 2
+        }
+      },
+      "title": "Alerts in a max-priority heap",
+      "description": "### Alerts in a max-priority heap\n\n**DSA topic:** 9. Binary heap (priority queue)\n\nHigher severity first; equal severity → older first. Overdue shipments are found first (`sweepOverdue`)."
+    },
+    {
+      "file": "shared/dsa/heap.ts",
+      "selection": {
+        "start": {
+          "line": 17,
+          "character": 1
+        },
+        "end": {
+          "line": 47,
+          "character": 16
+        }
+      },
+      "title": "Heap push (sift up) and pop (sift down)",
+      "description": "### Heap push (sift up) and pop (sift down)\n\n**DSA topic:** 9. Binary heap (priority queue)\n\nChildren of index i are 2i+1 and 2i+2. Push and pop are O(log n), and the most urgent alert is always at index 0."
+    }
+  ]
+}

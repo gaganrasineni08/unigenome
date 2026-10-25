@@ -1,0 +1,162 @@
+{
+  "$schema": "https://aka.ms/codetour-schema",
+  "title": "01 · A QR scanned twice (a copied QR) gets flagged",
+  "description": "1. Seller side: sell one item at the retailer (Shelf → Sell). Copy that item's QR link.\n2. Buyer A: open the link, and type the hidden code to claim the item. The verdict is Genuine.\n3. Buyer B: open the same link in a private (incognito) window. That counts as a different phone.\n4. The verdict is **Suspicious clone: already claimed by a buyer**. The regulator's Alerts tab shows a new 'clone' alert at the top.\n\nA second way to show it: scan in one city, then set the browser location far away (Chrome DevTools → Sensors) and scan again. The second scan is flagged as impossible travel.\n\nOne honest point to make: scanning twice **from the same phone in the same place is not flagged**. A shopper often scans twice. The system flags a second scan only when it shows a copy: another phone after the item was claimed, travel that is too fast, a scan far from the shop, or too many phones.",
+  "isPrimary": true,
+  "steps": [
+    {
+      "title": "How to show it",
+      "description": "## A QR scanned twice (a copied QR) gets flagged\n\n**How to show it in the app**\n\n1. Seller side: sell one item at the retailer (Shelf → Sell). Copy that item's QR link.\n2. Buyer A: open the link, and type the hidden code to claim the item. The verdict is Genuine.\n3. Buyer B: open the same link in a private (incognito) window. That counts as a different phone.\n4. The verdict is **Suspicious clone: already claimed by a buyer**. The regulator's Alerts tab shows a new 'clone' alert at the top.\n\nA second way to show it: scan in one city, then set the browser location far away (Chrome DevTools → Sensors) and scan again. The second scan is flagged as impossible travel.\n\nOne honest point to make: scanning twice **from the same phone in the same place is not flagged**. A shopper often scans twice. The system flags a second scan only when it shows a copy: another phone after the item was claimed, travel that is too fast, a scan far from the shop, or too many phones."
+    },
+    {
+      "file": "src/pages/portals/Buyer.tsx",
+      "selection": {
+        "start": {
+          "line": 109,
+          "character": 1
+        },
+        "end": {
+          "line": 109,
+          "character": 132
+        }
+      },
+      "title": "The buyer's phone sends the scan",
+      "description": "### The buyer's phone sends the scan\n\n**DSA topic:** 13. Haversine distance + speed check\n\nWhen a buyer opens a QR link, the phone sends the QR text, a **device id** (a random id saved on that phone) and its **GPS position** to the server.\nEvery check below works on these three things."
+    },
+    {
+      "file": "src/lib/device.ts",
+      "selection": {
+        "start": {
+          "line": 4,
+          "character": 1
+        },
+        "end": {
+          "line": 8,
+          "character": 6
+        }
+      },
+      "title": "How we tell two phones apart",
+      "description": "### How we tell two phones apart\n\nThe first time a phone scans, it makes a random id and keeps it. A different phone (or a private window) gets a different id.\nThis is how the server knows that *another* phone scanned the same QR."
+    },
+    {
+      "file": "server/app.ts",
+      "selection": {
+        "start": {
+          "line": 645,
+          "character": 1
+        },
+        "end": {
+          "line": 650,
+          "character": 142
+        }
+      },
+      "title": "The verify endpoint",
+      "description": "### The verify endpoint\n\nThe server passes the scan to `verifyScan` with `record: true`, so this scan is saved and later scans are compared with it."
+    },
+    {
+      "file": "server/logic.ts",
+      "selection": {
+        "start": {
+          "line": 298,
+          "character": 1
+        },
+        "end": {
+          "line": 301,
+          "character": 6
+        }
+      },
+      "title": "Check 1: the item was already claimed by another phone",
+      "description": "### Check 1: the item was already claimed by another phone\n\n**DSA topic:** 1. SHA-256 hashing\n\nInside every pack there is a **hidden code**. The first genuine buyer types it in, and the server stores the time and that buyer's device id (`claimed_ts`, `claimed_device`).\nIf the item is already claimed and **a different phone** scans it, someone has copied the printed QR. `clone = true` and the reason is written down.\n\n**Data structure:** the hidden code is never stored as plain text. Only its **SHA-256 hash** is stored (see the claim step), so even a database leak does not reveal the codes."
+    },
+    {
+      "file": "server/logic.ts",
+      "selection": {
+        "start": {
+          "line": 302,
+          "character": 1
+        },
+        "end": {
+          "line": 313,
+          "character": 6
+        }
+      },
+      "title": "Check 2: impossible travel since the last scan",
+      "description": "### Check 2: impossible travel since the last scan\n\n**DSA topic:** 3. Hash map / hash set, 13. Haversine distance + speed check\n\n`ix.lastSeen` is our own **hash map** (unit id → where and when it was last scanned). Looking up the last scan is O(1) on average, so this check stays fast with millions of items.\n\n`haversineKm` gives the distance on the Earth's surface between the last scan and this one. `impliedSpeedKmh` divides it by the time between the scans.\nIf the item would have had to travel faster than **900 km/h** (`MAX_SPEED_KMH`, faster than a plane), one physical pack cannot be in both places: the QR was copied. Under 5 km is treated as GPS noise."
+    },
+    {
+      "file": "server/logic.ts",
+      "selection": {
+        "start": {
+          "line": 314,
+          "character": 1
+        },
+        "end": {
+          "line": 328,
+          "character": 8
+        }
+      },
+      "title": "Check 3: an unsold item scanned far away from its shop",
+      "description": "### Check 3: an unsold item scanned far away from its shop\n\n**DSA topic:** 6. Tree + DFS, 13. Haversine distance + speed check\n\nIf records say the item is still on a retailer's shelf (not sold), it should be near that shop. `effectiveCustody` walks **up the packaging tree** to find who holds it.\nIf it is scanned more than **50 km** (`SHELF_RADIUS_KM`) away, the QR is being used somewhere it cannot be."
+    },
+    {
+      "file": "server/logic.ts",
+      "selection": {
+        "start": {
+          "line": 330,
+          "character": 1
+        },
+        "end": {
+          "line": 337,
+          "character": 6
+        }
+      },
+      "title": "Check 4: too many different phones",
+      "description": "### Check 4: too many different phones\n\nCounts how many different phones have scanned this item. More than **5** (`MAX_DEVICES`) for one pack means the QR was photocopied and shared."
+    },
+    {
+      "file": "server/logic.ts",
+      "selection": {
+        "start": {
+          "line": 338,
+          "character": 1
+        },
+        "end": {
+          "line": 338,
+          "character": 71
+        }
+      },
+      "title": "Any failed check → Suspicious clone",
+      "description": "### Any failed check → Suspicious clone\n\nIf any of the four checks set `clone = true`, the verdict becomes **SUSPICIOUS_CLONE** and the buyer sees the reasons."
+    },
+    {
+      "file": "server/logic.ts",
+      "selection": {
+        "start": {
+          "line": 341,
+          "character": 1
+        },
+        "end": {
+          "line": 351,
+          "character": 4
+        }
+      },
+      "title": "The scan is saved and an alert is raised",
+      "description": "### The scan is saved and an alert is raised\n\n**DSA topic:** 3. Hash map / hash set, 9. Binary heap (priority queue)\n\nThe scan is stored (location rounded to about 1 km for the buyer's privacy), and `ix.lastSeen` is **updated in the hash map**, so the *next* scan is compared with this one. That is why the *second* scan is the one that gets caught.\n\n`raiseAlert` adds a **severity-4 'clone' alert**. Alerts are later ordered with a **binary heap** (see the Alerts tour), so this one shows near the top of the regulator's list. The `dedupe` key stops the same phone from raising the same alert twice."
+    },
+    {
+      "file": "server/app.ts",
+      "selection": {
+        "start": {
+          "line": 653,
+          "character": 1
+        },
+        "end": {
+          "line": 664,
+          "character": 4
+        }
+      },
+      "title": "How an item gets claimed (the hidden code)",
+      "description": "### How an item gets claimed (the hidden code)\n\n**DSA topic:** 1. SHA-256 hashing\n\nIf the item is already claimed, a different phone is told so (that is what makes check 1 work).\nOtherwise the typed code is hashed with **SHA-256** (`hashClaim`) and compared with the stored hash. Only the person holding the real pack can know the code, because it is printed *inside* the pack."
+    }
+  ]
+}

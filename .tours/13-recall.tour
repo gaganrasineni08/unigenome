@@ -1,0 +1,71 @@
+{
+  "$schema": "https://aka.ms/codetour-schema",
+  "title": "13 · Recall: who received the batch, and whom to inspect",
+  "description": "Regulator → Recall → pick a batch. See the BFS graph, the DP table and the greedy result side by side.",
+  "steps": [
+    {
+      "title": "How to show it",
+      "description": "## Recall: who received the batch, and whom to inspect\n\n**How to show it in the app**\n\nRegulator → Recall → pick a batch. See the BFS graph, the DP table and the greedy result side by side."
+    },
+    {
+      "file": "server/logic.ts",
+      "selection": {
+        "start": {
+          "line": 359,
+          "character": 1
+        },
+        "end": {
+          "line": 377,
+          "character": 36
+        }
+      },
+      "title": "Build the shipment graph and run BFS",
+      "description": "### Build the shipment graph and run BFS\n\n**DSA topic:** 7. Graph + BFS\n\nEvery shipment of a container that held the batch becomes an edge. **BFS** from the manufacturer finds every company the batch reached, level by level."
+    },
+    {
+      "file": "shared/dsa/graph.ts",
+      "selection": {
+        "start": {
+          "line": 33,
+          "character": 1
+        },
+        "end": {
+          "line": 51,
+          "character": 2
+        }
+      },
+      "title": "Breadth-first search with a queue",
+      "description": "### Breadth-first search with a queue\n\n**DSA topic:** 7. Graph + BFS\n\nO(V + E). `head` moves forward so dequeue is O(1)."
+    },
+    {
+      "file": "server/logic.ts",
+      "selection": {
+        "start": {
+          "line": 414,
+          "character": 1
+        },
+        "end": {
+          "line": 417,
+          "character": 52
+        }
+      },
+      "title": "Pick sites to inspect: 0/1 knapsack",
+      "description": "### Pick sites to inspect: 0/1 knapsack\n\n**DSA topic:** 10. 0/1 knapsack (dynamic programming) vs greedy\n\nEach site has a cost (budget), needs inspectors, and has a risk score. **Dynamic programming** picks the set with the highest total risk within both limits. Greedy is shown next to it, because it can miss the best answer."
+    },
+    {
+      "file": "shared/dsa/knapsack.ts",
+      "selection": {
+        "start": {
+          "line": 23,
+          "character": 1
+        },
+        "end": {
+          "line": 61,
+          "character": 2
+        }
+      },
+      "title": "The DP table",
+      "description": "### The DP table\n\n**DSA topic:** 10. 0/1 knapsack (dynamic programming) vs greedy\n\ndp[i][b][s] = max(skip site i, take site i). O(n · B · S). Walking back through the table recovers which sites were chosen."
+    }
+  ]
+}

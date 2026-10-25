@@ -1,0 +1,101 @@
+{
+  "$schema": "https://aka.ms/codetour-schema",
+  "title": "05 · Creating a batch and issuing item QRs",
+  "description": "Manufacturer (`sunpharma`) → Batches → create a batch. Sign in as `sunqa` to approve it.\nBack as `sunpharma` → Issue → pick the batch and a number of items → every item's QR appears, each with its hidden code.",
+  "steps": [
+    {
+      "title": "How to show it",
+      "description": "## Creating a batch and issuing item QRs\n\n**How to show it in the app**\n\nManufacturer (`sunpharma`) → Batches → create a batch. Sign in as `sunqa` to approve it.\nBack as `sunpharma` → Issue → pick the batch and a number of items → every item's QR appears, each with its hidden code."
+    },
+    {
+      "file": "server/app.ts",
+      "selection": {
+        "start": {
+          "line": 282,
+          "character": 1
+        },
+        "end": {
+          "line": 302,
+          "character": 4
+        }
+      },
+      "title": "Creating a batch",
+      "description": "### Creating a batch\n\n**DSA topic:** 2. Digital signatures (Ed25519), 11. Trie, 12. AVL tree\n\nThe batch is **signed** by the manufacturer. Its id goes into the **trie** (for search by prefix), and its expiry date into the **AVL tree** (for 'what expires soon')."
+    },
+    {
+      "file": "server/app.ts",
+      "selection": {
+        "start": {
+          "line": 305,
+          "character": 1
+        },
+        "end": {
+          "line": 317,
+          "character": 4
+        }
+      },
+      "title": "A second person must approve",
+      "description": "### A second person must approve\n\n**DSA topic:** 2. Digital signatures (Ed25519)\n\nA quality approver of the same manufacturer **co-signs** the batch. One person alone cannot issue items, which stops an insider from printing extra codes."
+    },
+    {
+      "file": "src/pages/portals/Manufacturer.tsx",
+      "selection": {
+        "start": {
+          "line": 253,
+          "character": 1
+        },
+        "end": {
+          "line": 258,
+          "character": 159
+        }
+      },
+      "title": "Each item is made and signed in the browser",
+      "description": "### Each item is made and signed in the browser\n\n**DSA topic:** 1. SHA-256 hashing, 2. Digital signatures (Ed25519), 4. Hash chain (linked list by hashes)\n\nEach item gets a **random salt**, so no one can guess valid item details.\nA random **hidden code** is made for inside the pack. Only its **SHA-256 hash** is sent to the server.\n`signUnit` signs the item's fingerprint. The first custody record (`MANUFACTURED`) has `prev: \"0\"`: it is the **first link of the hash chain**."
+    },
+    {
+      "file": "server/app.ts",
+      "selection": {
+        "start": {
+          "line": 349,
+          "character": 1
+        },
+        "end": {
+          "line": 349,
+          "character": 162
+        }
+      },
+      "title": "Issuance limit",
+      "description": "### Issuance limit\n\nThe server never issues more items than the batch quantity."
+    },
+    {
+      "file": "server/app.ts",
+      "selection": {
+        "start": {
+          "line": 354,
+          "character": 1
+        },
+        "end": {
+          "line": 357,
+          "character": 105
+        }
+      },
+      "title": "Every item's signature is checked",
+      "description": "### Every item's signature is checked\n\n**DSA topic:** 2. Digital signatures (Ed25519)\n\nThe server checks the signature on each item and on its first custody record before saving."
+    },
+    {
+      "file": "server/app.ts",
+      "selection": {
+        "start": {
+          "line": 372,
+          "character": 1
+        },
+        "end": {
+          "line": 374,
+          "character": 122
+        }
+      },
+      "title": "Item ids go into the trie and the last-seen map",
+      "description": "### Item ids go into the trie and the last-seen map\n\n**DSA topic:** 11. Trie, 3. Hash map / hash set\n\nEach item id is added to the **trie** (search) and its first location to the `lastSeen` **hash map** (used for clone detection)."
+    }
+  ]
+}

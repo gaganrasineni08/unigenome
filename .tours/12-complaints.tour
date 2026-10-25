@@ -1,0 +1,26 @@
+{
+  "$schema": "https://aka.ms/codetour-schema",
+  "title": "12 · Buyer complaints",
+  "description": "Buyer → scan → Report a problem. Regulator → Complaints and Alerts.",
+  "steps": [
+    {
+      "title": "How to show it",
+      "description": "## Buyer complaints\n\n**How to show it in the app**\n\nBuyer → scan → Report a problem. Regulator → Complaints and Alerts."
+    },
+    {
+      "file": "server/app.ts",
+      "selection": {
+        "start": {
+          "line": 668,
+          "character": 1
+        },
+        "end": {
+          "line": 688,
+          "character": 51
+        }
+      },
+      "title": "Complaint severity",
+      "description": "### Complaint severity\n\n**DSA topic:** 1. SHA-256 hashing, 9. Binary heap (priority queue)\n\nSeverity depends on the reason, +1 if the buyer proved they hold the pack (the hidden code matches its **SHA-256** hash), +1 if the scan was counterfeit or a clone.\nAt most 3 complaints per phone per hour, to stop spam. Each complaint becomes an alert in the **heap**."
+    }
+  ]
+}

@@ -499,16 +499,13 @@ authed.post("/events", async (c) => {
         await raiseAlert({ kind: "diverted", severity: 4, unit: unit.id, party: me.id, message: `${me.name} tried to receive ${unit.id}, which was sent to ${ix.parties.get(inTransitTo!)?.name}` });
         bad(`This shipment was sent to another company. Only they can receive it.`, 403);
       }
-      const diverted = false;
       await d.tx(async (q) => {
-        await appendEvent(q, body, sig, diverted ? [...flags, `expected at ${ix.parties.get(inTransitTo!)?.name}`] : flags);
+        await appendEvent(q, body, sig, flags);
         await q("UPDATE units SET custodian = $1, in_transit_to = NULL WHERE id = $2", [me.id, unit.id]);
-        if (ship) await q("UPDATE shipments SET received_ts = $1, received_by = $2, status = $3 WHERE id = $4", [body.ts, me.id, diverted ? "diverted" : "received", ship.id]);
+        if (ship) await q("UPDATE shipments SET received_ts = $1, received_by = $2, status = 'received' WHERE id = $3", [body.ts, me.id, ship.id]);
       });
-      if (diverted)
-        await raiseAlert({ kind: "diverted", severity: 4, unit: unit.id, party: me.id, message: `${unit.id} was meant for ${ix.parties.get(inTransitTo!)?.name} but was received by ${me.name}` });
       const sub = await subtree(unit.id);
-      extra = { transitHours: ship ? (body.ts - Number(ship.dispatched_ts)) / 3600_000 : null, diverted, itemsUpdated: sub.items.length };
+      extra = { transitHours: ship ? (body.ts - Number(ship.dispatched_ts)) / 3600_000 : null, itemsUpdated: sub.items.length };
       break;
     }
     case "STORED":

@@ -1,0 +1,116 @@
+{
+  "$schema": "https://aka.ms/codetour-schema",
+  "title": "02 · A fake or edited QR is caught as counterfeit",
+  "description": "Take any item's QR link, change one character in the part after `#`, and open it. The verdict is **Counterfeit**.\nEven with no internet, the first check runs on the phone.",
+  "steps": [
+    {
+      "title": "How to show it",
+      "description": "## A fake or edited QR is caught as counterfeit\n\n**How to show it in the app**\n\nTake any item's QR link, change one character in the part after `#`, and open it. The verdict is **Counterfeit**.\nEven with no internet, the first check runs on the phone."
+    },
+    {
+      "file": "src/pages/portals/Buyer.tsx",
+      "selection": {
+        "start": {
+          "line": 37,
+          "character": 1
+        },
+        "end": {
+          "line": 48,
+          "character": 2
+        }
+      },
+      "title": "On the phone, even offline: check the signature",
+      "description": "### On the phone, even offline: check the signature\n\n**DSA topic:** 2. Digital signatures (Ed25519), 3. Hash map / hash set\n\nThe phone keeps a copy of every company's **public key**. It decodes the QR, finds the company that signed it, and checks the **Ed25519 signature**.\nIf anyone changes even one character of the QR (product, batch, expiry), the signature no longer matches. Making a valid signature needs the manufacturer's private key, which never leaves their browser."
+    },
+    {
+      "file": "server/logic.ts",
+      "selection": {
+        "start": {
+          "line": 262,
+          "character": 1
+        },
+        "end": {
+          "line": 269,
+          "character": 57
+        }
+      },
+      "title": "On the server: who signed it, and is the signature right?",
+      "description": "### On the server: who signed it, and is the signature right?\n\n**DSA topic:** 2. Digital signatures (Ed25519), 3. Hash map / hash set\n\n`ix.parties` is our **hash map** from company id to public key. Finding the key is O(1) on average, which matters because every single scan needs it.\n`verifyUnit` re-computes the item's fingerprint and checks the signature against that public key."
+    },
+    {
+      "file": "shared/identity.ts",
+      "selection": {
+        "start": {
+          "line": 35,
+          "character": 1
+        },
+        "end": {
+          "line": 43,
+          "character": 2
+        }
+      },
+      "title": "The item's fingerprint (DNA0) and its signature",
+      "description": "### The item's fingerprint (DNA0) and its signature\n\n**DSA topic:** 1. SHA-256 hashing, 2. Digital signatures (Ed25519)\n\n`dnaOf` is the **SHA-256 hash** of all the item's details (product, batch, dates, and a random salt). Change one letter and the hash changes completely.\n`signUnit` signs that hash with the manufacturer's private key. `verifyUnit` checks it with the public key."
+    },
+    {
+      "file": "shared/crypto.ts",
+      "selection": {
+        "start": {
+          "line": 26,
+          "character": 1
+        },
+        "end": {
+          "line": 38,
+          "character": 2
+        }
+      },
+      "title": "Signing and verifying (Ed25519)",
+      "description": "### Signing and verifying (Ed25519)\n\n**DSA topic:** 2. Digital signatures (Ed25519)\n\nEach message starts with a **domain tag** such as `UG/item` or `UG/event`, so a signature made for one purpose can never be reused for another.\n`canonical(body)` writes the object with sorted keys, so the same data always gives the same bytes."
+    },
+    {
+      "file": "server/logic.ts",
+      "selection": {
+        "start": {
+          "line": 267,
+          "character": 1
+        },
+        "end": {
+          "line": 268,
+          "character": 181
+        }
+      },
+      "title": "Was this code ever really issued?",
+      "description": "### Was this code ever really issued?\n\n**DSA topic:** 1. SHA-256 hashing\n\nEven a correctly signed code must be in the **issuance log** with the same DNA0. This catches codes made by a stolen key outside the normal issuing process."
+    },
+    {
+      "file": "server/logic.ts",
+      "selection": {
+        "start": {
+          "line": 269,
+          "character": 1
+        },
+        "end": {
+          "line": 270,
+          "character": 95
+        }
+      },
+      "title": "Has the company's key been revoked?",
+      "description": "### Has the company's key been revoked?\n\n**DSA topic:** 3. Hash map / hash set\n\n`ix.revoked` is a **hash set**. Checking it is O(1). If a company's key was stolen, the regulator revokes it, and every code it signs is rejected from then on."
+    },
+    {
+      "file": "server/logic.ts",
+      "selection": {
+        "start": {
+          "line": 272,
+          "character": 1
+        },
+        "end": {
+          "line": 279,
+          "character": 106
+        }
+      },
+      "title": "Did a second person approve the batch?",
+      "description": "### Did a second person approve the batch?\n\n**DSA topic:** 2. Digital signatures (Ed25519)\n\nA batch needs two signatures: the manufacturer and a separate quality approver. Without the second one, items from the batch are counterfeit."
+    }
+  ]
+}

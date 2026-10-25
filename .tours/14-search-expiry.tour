@@ -1,0 +1,86 @@
+{
+  "$schema": "https://aka.ms/codetour-schema",
+  "title": "14 · Search by id and 'expiring soon'",
+  "description": "DSA page → Trie and AVL tabs, or the search box in the portals.",
+  "steps": [
+    {
+      "title": "How to show it",
+      "description": "## Search by id and 'expiring soon'\n\n**How to show it in the app**\n\nDSA page → Trie and AVL tabs, or the search box in the portals."
+    },
+    {
+      "file": "server/app.ts",
+      "selection": {
+        "start": {
+          "line": 755,
+          "character": 1
+        },
+        "end": {
+          "line": 759,
+          "character": 4
+        }
+      },
+      "title": "Search by prefix",
+      "description": "### Search by prefix\n\n**DSA topic:** 11. Trie\n\nType 'B-10' and get every id starting with it."
+    },
+    {
+      "file": "shared/dsa/trie.ts",
+      "selection": {
+        "start": {
+          "line": 42,
+          "character": 1
+        },
+        "end": {
+          "line": 55,
+          "character": 4
+        }
+      },
+      "title": "Trie search",
+      "description": "### Trie search\n\n**DSA topic:** 11. Trie\n\nWalk one node per character (O(p)), then collect the ids below that node."
+    },
+    {
+      "file": "server/app.ts",
+      "selection": {
+        "start": {
+          "line": 761,
+          "character": 1
+        },
+        "end": {
+          "line": 770,
+          "character": 4
+        }
+      },
+      "title": "What expires in the next N days",
+      "description": "### What expires in the next N days\n\n**DSA topic:** 12. AVL tree\n\nA range query on the AVL tree."
+    },
+    {
+      "file": "shared/dsa/avl.ts",
+      "selection": {
+        "start": {
+          "line": 41,
+          "character": 1
+        },
+        "end": {
+          "line": 63,
+          "character": 4
+        }
+      },
+      "title": "AVL insert with rotations",
+      "description": "### AVL insert with rotations\n\n**DSA topic:** 12. AVL tree\n\nAfter each insert the tree re-balances with rotations, so its height stays O(log n)."
+    },
+    {
+      "file": "shared/dsa/avl.ts",
+      "selection": {
+        "start": {
+          "line": 66,
+          "character": 1
+        },
+        "end": {
+          "line": 77,
+          "character": 1
+        }
+      },
+      "title": "Range query",
+      "description": "### Range query\n\n**DSA topic:** 12. AVL tree\n\nSkips whole branches outside the range: O(log n + k)."
+    }
+  ]
+}

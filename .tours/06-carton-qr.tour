@@ -1,0 +1,71 @@
+{
+  "$schema": "https://aka.ms/codetour-schema",
+  "title": "06 · One carton QR stands for every item inside",
+  "description": "After issuing: Step 3 → choose items per carton → Pack. Each carton gets one QR.\nDSA page → Merkle tree: see the levels of hashes and the proof for one item.",
+  "steps": [
+    {
+      "title": "How to show it",
+      "description": "## One carton QR stands for every item inside\n\n**How to show it in the app**\n\nAfter issuing: Step 3 → choose items per carton → Pack. Each carton gets one QR.\nDSA page → Merkle tree: see the levels of hashes and the proof for one item."
+    },
+    {
+      "file": "src/pages/portals/Manufacturer.tsx",
+      "selection": {
+        "start": {
+          "line": 307,
+          "character": 1
+        },
+        "end": {
+          "line": 315,
+          "character": 2
+        }
+      },
+      "title": "Packing items into a carton",
+      "description": "### Packing items into a carton\n\n**DSA topic:** 5. Merkle tree\n\nThe item ids are sorted and their **Merkle root** is put into the carton's signed QR. The root is one hash that depends on every item inside."
+    },
+    {
+      "file": "shared/dsa/merkle.ts",
+      "selection": {
+        "start": {
+          "line": 13,
+          "character": 1
+        },
+        "end": {
+          "line": 23,
+          "character": 2
+        }
+      },
+      "title": "Building the Merkle tree",
+      "description": "### Building the Merkle tree\n\n**DSA topic:** 5. Merkle tree, 1. SHA-256 hashing\n\nEach item id is hashed (a leaf). Pairs of hashes are hashed together, level by level, until one hash is left: the **root**. O(n) hashes."
+    },
+    {
+      "file": "server/app.ts",
+      "selection": {
+        "start": {
+          "line": 406,
+          "character": 1
+        },
+        "end": {
+          "line": 406,
+          "character": 90
+        }
+      },
+      "title": "The server recomputes the root",
+      "description": "### The server recomputes the root\n\n**DSA topic:** 5. Merkle tree\n\nIf the list of items does not match the signed root, packing is refused. So the carton's QR provably lists exactly these items."
+    },
+    {
+      "file": "server/app.ts",
+      "selection": {
+        "start": {
+          "line": 427,
+          "character": 1
+        },
+        "end": {
+          "line": 428,
+          "character": 111
+        }
+      },
+      "title": "Building the packaging tree",
+      "description": "### Building the packaging tree\n\n**DSA topic:** 6. Tree + DFS\n\nEach item now points to its carton (`parent_id`), and each carton can point to a pallet. Together they form a **tree**: pallet → cartons → items."
+    }
+  ]
+}
