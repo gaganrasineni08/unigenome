@@ -120,7 +120,7 @@ export default function Home() {
 
       <main className="relative z-10">
         {STEPS.map((s, i) => (
-          <section key={i} data-chapter className="flex min-h-[100svh] items-center px-4">
+          <section key={i} data-chapter className="flex min-h-[100svh] items-end px-4 pb-8 sm:items-center sm:pb-0">
             <div className="mx-auto w-full max-w-6xl">
               <div className={`glass glass-strong max-w-md rounded-3xl p-6 sm:p-8 ${i === 0 ? "max-w-xl" : ""}`}>
                 <div className="mb-3 text-xs font-bold uppercase tracking-[0.2em]" style={{ color: s.color ?? "#02C39A" }}>{s.tag}</div>

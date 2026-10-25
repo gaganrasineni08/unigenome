@@ -65,7 +65,7 @@ const SHOTS: Shot[] = [
 
 function CameraRig({ chapter, truckState }: { chapter: P; truckState: MutableRefObject<{ pos: THREE.Vector3; deg: number }> }) {
   const { camera, size } = useThree();
-  const st = useMemo(() => ({ pos: new THREE.Vector3(), look: new THREE.Vector3(), vel: new THREE.Vector3(), roll: 0, shift: -1, init: false }), []);
+  const st = useMemo(() => ({ pos: new THREE.Vector3(), look: new THREE.Vector3(), vel: new THREE.Vector3(), roll: 0, view: "", init: false }), []);
   const a = useMemo(() => [new THREE.Vector3(), new THREE.Vector3()], []);
   const reduced = useMemo(() => matchMedia("(prefers-reduced-motion: reduce)").matches, []);
   useFrame(({ clock }, dt) => {
@@ -101,14 +101,17 @@ function CameraRig({ chapter, truckState }: { chapter: P; truckState: MutableRef
     const target = reduced ? 0 : clamp(-st.vel.dot(right) * 0.006, -0.16, 0.16);
     st.roll += (target - st.roll) * (1 - Math.exp(-dt * 2.5));
     camera.rotateZ(st.roll);
-    // On wide screens the story card covers the left side, so frame the subject to its right
-    // (by rendering the left part of a wider view). The portals chapter centres it again.
-    const shift = aspect > 1.2 ? 0.34 * (1 - clamp(f - (SHOTS.length - 2))) : 0;
-    const cam = camera as THREE.PerspectiveCamera;
-    if (Math.abs(shift - st.shift) > 1e-3 || cam.view?.fullWidth !== Math.round(size.width * (1 + shift))) {
-      st.shift = shift;
-      if (shift > 0) cam.setViewOffset(Math.round(size.width * (1 + shift)), size.height, 0, 0, size.width, size.height);
-      else cam.clearViewOffset();
+    // The story card covers part of the screen: the left side on wide screens, the bottom on phones.
+    // Frame the subject beside it by rendering part of a larger view. The portals chapter centres it.
+    const shift = 0.34 * (1 - clamp(f - (SHOTS.length - 2)));
+    const wide = aspect > 1.2;
+    const key = `${size.width}x${size.height}:${wide}:${shift.toFixed(3)}`;
+    if (key !== st.view) {
+      st.view = key;
+      const cam = camera as THREE.PerspectiveCamera;
+      if (shift < 1e-3) cam.clearViewOffset();
+      else if (wide) cam.setViewOffset(Math.round(size.width * (1 + shift)), size.height, 0, 0, size.width, size.height);
+      else cam.setViewOffset(size.width, Math.round(size.height * (1 + shift)), 0, Math.round(size.height * shift), size.width, size.height);
     }
   });
   return null;
