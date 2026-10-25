@@ -34,7 +34,7 @@ export default function WarehousePortal() {
       <Page>
         <Routes>
           <Route index element={<><H1 sub="Scan the one QR on a pallet or carton. Receiving, storing, checking or dispatching it updates every item inside, with your location and time signed in.">Scan</H1><ScanAct allowed={["RECEIVED", "DISPATCHED", "STORED", "CONDITION", "UNPACKED"]} /></>} />
-          <Route path="stock" element={<><H1>Stock</H1><Inventory /></>} />
+          <Route path="stock" element={<><H1>Stock</H1><Inventory scanPath="/warehouse" /></>} />
           <Route path="repack" element={<Repack />} />
           <Route path="shipments" element={<Shipments />} />
           <Route path="alerts" element={<AlertsPanel />} />

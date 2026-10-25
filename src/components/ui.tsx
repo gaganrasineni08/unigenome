@@ -117,7 +117,13 @@ export function TopBar({ title, color, tabs, right }: { title: string; color: st
         <span className="rounded-full px-2.5 py-0.5 text-xs font-bold" style={{ background: color + "22", color }}>
           {title}
         </span>
-        <div className="ml-auto flex items-center gap-2">{right}</div>
+        <div className="ml-auto flex items-center gap-2">
+          <Link to="/" className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium text-mute transition hover:bg-white/10 hover:text-ink" title="Back to the home page">
+            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 11l9-8 9 8" /><path d="M5 10v10h14V10" /></svg>
+            <span className="hidden sm:inline">Home</span>
+          </Link>
+          {right}
+        </div>
       </div>
       {tabs && (
         <nav className="mx-auto flex max-w-6xl gap-1 overflow-x-auto px-3 pb-2">

@@ -1,6 +1,7 @@
 // The staff scan screen: scan a QR, see what it is and who holds it, then record what you did with it.
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { verifyProof } from "../../shared/dsa/merkle";
 import { api } from "../lib/api";
 import { EVENT_LABEL, fmtDateTime, fmtHours } from "../lib/format";
@@ -30,13 +31,21 @@ export function ScanAct({ allowed }: { allowed: Action[] }) {
     if (me) locate(me).then(setWhere);
   }, [me]);
 
-  const open = (text: string) =>
+  const open = (text: string, preset?: Action | null) =>
     load.run(async () => {
       setResult(null);
       setAction(null);
       setForm({});
       setUnit(await api("/units/" + encodeURIComponent(unitIdFromScan(text))));
+      if (preset && allowed.includes(preset)) setAction(preset);
     });
+
+  // Opened from the stock or shelf list: ?unit=B-1024-007&do=SOLD
+  const [params] = useSearchParams();
+  useEffect(() => {
+    const u = params.get("unit");
+    if (u && me) open(u, params.get("do") as Action | null);
+  }, [me, params.get("unit")]);
 
   const reload = async () => setUnit(await api("/units/" + unit.id));
 

@@ -229,7 +229,7 @@ function Issue() {
   const [batches, setBatches] = useState<any[]>([]);
   const [pick, setPick] = useState("");
   const [n, setN] = useState("24");
-  const [done, setDone] = useState<{ batch: string; ids: string[] } | null>(null);
+  const [done, setDone] = useState<{ batch: string; ids: string[]; items: Array<{ id: string; payload: string; code: string }> } | null>(null);
   const [progress, setProgress] = useState(0);
   const { busy, error, run } = useAsync();
   const load = () => api<any[]>("/batches").then((b) => { setBatches(b); if (!pick) setPick(b.find((x) => x.status === "approved" && x.issued < x.quantity)?.id ?? ""); });
@@ -263,7 +263,7 @@ function Issue() {
         setProgress(50 + Math.round(((i + 100) / items.length) * 50));
       }
       labelStore.add(batch.id, codes);
-      setDone({ batch: batch.id, ids: Object.keys(codes) });
+      setDone({ batch: batch.id, ids: Object.keys(codes), items: items.map((it) => ({ id: it.unit.f.id, payload: encodePayload(it.unit), code: codes[it.unit.f.id] })) });
       await load();
     });
   return (
@@ -287,18 +287,126 @@ function Issue() {
             {batches.some((b) => b.status === "awaiting_qa") && <p className="text-sm text-amber">Some batches are still waiting for the quality approver's signature.</p>}
           </div>
         </Card>
-        {done && (
-          <Card>
-            <H2>Issued {done.ids.length} items</H2>
-            <p className="text-sm text-mute">{done.ids[0]} to {done.ids[done.ids.length - 1]}. Their hidden codes are saved on this device for printing.</p>
-            <div className="mt-4 flex gap-2">
-              <Link to="/manufacturer/pack"><Button>Pack them into a carton</Button></Link>
-              <Link to={`/manufacturer/labels?batch=${done.batch}`}><Button variant="soft">Print labels</Button></Link>
-            </div>
-          </Card>
-        )}
+        <Card className="h-fit">
+          <H2>How it goes</H2>
+          <ol className="list-decimal space-y-1.5 pl-5 text-sm text-mute">
+            <li><b className="text-ink">Issue</b>: every item gets its own signed QR.</li>
+            <li><b className="text-ink">Item QRs</b>: print them on the packs.</li>
+            <li><b className="text-ink">Carton</b>: put the items in cartons; each carton gets <i>one</i> QR that stands for all of them.</li>
+            <li><b className="text-ink">Pallet</b> (optional): one QR for several cartons.</li>
+            <li><b className="text-ink">Dispatch</b>: scan the carton or pallet and send it.</li>
+          </ol>
+        </Card>
       </div>
+      {done && <AfterIssue key={done.batch + done.ids[0]} batch={done.batch} items={done.items} />}
     </>
+  );
+}
+
+/** Pack a set of units into one signed carton or pallet whose QR carries the Merkle root of its contents. */
+async function packInto(me: any, secretKey: string, kind: "carton" | "pallet", ids: string[]) {
+  const children = [...ids].sort();
+  const f: ContainerFields = { kind, id: (kind === "carton" ? "C-" : "P-") + toHex(randomBytes(3)).toUpperCase(), by: me.id, count: children.length, root: merkleRoot(children), packed: new Date().toISOString() };
+  const where = await locate(me);
+  const body: EventBody = { unit: f.id, type: "PACKED", actor: me.id, ts: Date.now(), lat: where.fix.lat, lng: where.fix.lng, acc: where.fix.acc, site: where.site?.id ?? null, prev: "0", data: { count: children.length } };
+  const unit = signUnit(f, secretKey);
+  await api("/containers", { body: { unit, children, event: { body, sig: signEvent(body, secretKey) } } });
+  return { id: f.id, payload: encodePayload(unit), count: children.length, children };
+}
+
+type Made = { id: string; payload: string; count: number; children: string[] };
+
+/** Steps 2 to 4 right after issuing: the item QRs, then cartons (one QR each), then an optional pallet. */
+function AfterIssue({ batch, items }: { batch: string; items: Array<{ id: string; payload: string; code: string }> }) {
+  const { me, secretKey } = useSession();
+  const [per, setPer] = useState(String(Math.min(12, items.length)));
+  const [cartons, setCartons] = useState<Made[] | null>(null);
+  const [pallet, setPallet] = useState<Made | null>(null);
+  const { busy, error, run } = useAsync();
+  const size = Math.max(1, Math.floor(Number(per) || 1));
+  const groups = Math.ceil(items.length / size);
+
+  const packCartons = () =>
+    run(async () => {
+      const out: Made[] = [];
+      for (let i = 0; i < items.length; i += size) out.push(await packInto(me, secretKey!, "carton", items.slice(i, i + size).map((x) => x.id)));
+      setCartons(out);
+    });
+  const packPallet = () =>
+    run(async () => {
+      setPallet(await packInto(me, secretKey!, "pallet", cartons!.map((c) => c.id)));
+    });
+
+  return (
+    <div className="mt-6 space-y-6">
+      <Card>
+        <H2 right={<Badge tone="mint">{items.length} items</Badge>}>Step 2 · Item QR codes</H2>
+        <p className="mb-4 text-sm text-mute">Each item has its own signed QR, printed on the pack. The hidden code under it goes <i>inside</i> the pack, for the buyer to claim the item.</p>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
+          {items.map((it) => (
+            <div key={it.id} className="rounded-xl bg-white p-2 text-center text-[#011f22]">
+              <QrImage text={verifyUrl(it.payload)} size={120} className="mx-auto !p-0" />
+              <div className="mono mt-1 text-xs font-semibold">{it.id}</div>
+              <div className="mono text-[10px] text-[#55706d]">code {it.code.slice(0, 4)}-{it.code.slice(4)}</div>
+            </div>
+          ))}
+        </div>
+        <div className="mt-4"><Link to={`/manufacturer/labels?batch=${batch}`}><Button variant="soft">Open printable labels</Button></Link></div>
+      </Card>
+
+      <Card>
+        <H2>Step 3 · Pack into cartons</H2>
+        {!cartons ? (
+          <div className="flex flex-wrap items-end gap-3">
+            <Field label="Items per carton"><Input type="number" min={1} value={per} onChange={(e) => setPer(e.target.value)} className="!w-32" /></Field>
+            <Button busy={busy} onClick={packCartons}>Sign and pack into {groups} carton{groups > 1 ? "s" : ""}</Button>
+            {error && <Alert>{error}</Alert>}
+          </div>
+        ) : (
+          <>
+            <p className="mb-4 text-sm text-mute">One QR per carton. It carries the Merkle root of the items inside, so scanning this one code updates all of them.</p>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {cartons.map((c) => (
+                <div key={c.id} className="rounded-2xl border border-mint/40 bg-mint/5 p-4 text-center">
+                  <QrImage text={verifyUrl(c.payload)} size={170} className="mx-auto" />
+                  <div className="mono mt-2 text-lg font-semibold">{c.id}</div>
+                  <div className="text-sm text-mint">one QR for {c.count} items</div>
+                  <div className="mono mt-1 text-[11px] text-mute">{c.children[0]} … {c.children[c.children.length - 1]}</div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </Card>
+
+      {cartons && (
+        <Card>
+          <H2>Step 4 · Pallet (optional) and dispatch</H2>
+          {!pallet ? (
+            <div className="flex flex-wrap gap-2">
+              {cartons.length > 1 && <Button busy={busy} onClick={packPallet}>Put all {cartons.length} cartons on one pallet</Button>}
+              {cartons.length > 1 && <Link to="/manufacturer/scan"><Button variant="soft">Skip: dispatch cartons separately →</Button></Link>}
+            </div>
+          ) : (
+            <div className="flex flex-wrap items-center gap-6">
+              <div className="rounded-2xl border border-sea/40 bg-sea/5 p-4 text-center">
+                <QrImage text={verifyUrl(pallet.payload)} size={190} className="mx-auto" />
+                <div className="mono mt-2 text-lg font-semibold">{pallet.id}</div>
+                <div className="text-sm text-sea">one QR for {pallet.count} cartons · {items.length} items</div>
+              </div>
+              <div className="max-w-sm text-sm text-mute">
+                <p>Scan this pallet QR when you dispatch it: the record covers every carton and item on it.</p>
+                <Link to={`/manufacturer/scan?unit=${pallet.id}&do=DISPATCHED`}><Button className="mt-3">Dispatch this pallet →</Button></Link>
+              </div>
+            </div>
+          )}
+          {!pallet && cartons.length === 1 && (
+            <div className="mt-3"><Link to={`/manufacturer/scan?unit=${cartons[0].id}&do=DISPATCHED`}><Button>Dispatch this carton →</Button></Link></div>
+          )}
+          {error && <div className="mt-3"><Alert>{error}</Alert></div>}
+        </Card>
+      )}
+    </div>
   );
 }
 

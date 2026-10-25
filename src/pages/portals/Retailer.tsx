@@ -24,7 +24,7 @@ export default function RetailerPortal() {
       <Page>
         <Routes>
           <Route index element={<><H1 sub="Receive a carton, open it and spot-check the items the server picks, then scan each item when you sell it. A sale scan tells buyers' phones where the item should be.">Scan</H1><ScanAct allowed={["RECEIVED", "UNPACKED", "STORED", "CONDITION", "SOLD", "DISPATCHED"]} /></>} />
-          <Route path="shelf" element={<><H1>Shelf</H1><Inventory title="On your shelf" /></>} />
+          <Route path="shelf" element={<><H1>Shelf</H1><Inventory title="On your shelf" scanPath="/retailer" retail /></>} />
           <Route path="shipments" element={<Shipments />} />
           <Route path="alerts" element={<AlertsPanel />} />
         </Routes>
