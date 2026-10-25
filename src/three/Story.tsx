@@ -32,6 +32,11 @@ const EVENTS: Record<CpKey, [string, string]> = {
 
 // Where the hauler is (ring angle in degrees) at each chapter. It keeps driving after the buyer.
 const TRUCK = [176, 203, 217, 255, 300, 390, 480, 520, 560];
+// On the landing screen it loops over this stretch (through the factory arch at 210, then past the
+// camera and out of shot) at this many degrees a second, fading in at the far end of the road.
+const HERO_LOOP = [150, 258];
+const HERO_SPEED = 6;
+const HERO_FADE = 12; // degrees to fade in over
 
 // Blender's ring lies in its XY plane; on the page that is the XZ plane with z = -y.
 const ring = (r: number, deg: number, y = 0, out = new THREE.Vector3()) => {
@@ -55,7 +60,7 @@ const v = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
 const SHOTS: Shot[] = [
   // The drifts are bounded sways, not endless orbits, so every shot sits where it was framed however
   // long the page has been open, and each flight between shots always goes the same way round.
-  (_, __, t) => [ring(118, 236 + Math.sin(t * 0.06) * 12, 58), v(0, 6, 0), 44], // 0 hero: the whole ring
+  (_, __, t) => [ring(40, 248 + Math.sin(t * 0.1) * 1, 2.4 + Math.sin(t * 0.13) * 0.2), ring(31, 207, 4), 44], // 0 landing: low on the outer sidewalk, looking back down the road as the hauler rolls through the factory arch
   (_, __, t) => [ring(12, 186 + Math.sin(t * 0.2) * 2, 13), ring(47, 211, 8), 46], // 1 factory, from inside the ring
   (tr, d) => [ring(R_ROAD - 10.5, d + 5, 4.6), tr.clone().setY(2.5), 32], // 2 carton QR, beside and a little ahead of the hauler
   (_, d) => [ring(R_ROAD + 1.5, d - 25, 5.5), ring(R_ROAD - 1, d + 16, 1.5), 50], // 3 chase, low behind the hauler
@@ -170,16 +175,21 @@ function CameraRig({ chapter, sides, truckState }: { chapter: P; sides: number[]
     if (fovChanged) cam.fov = fov;
     // The story card covers part of the screen: one side on wide screens (it alternates), the bottom
     // on phones. Frame the subject beside it by rendering part of a larger view; when the card swaps
-    // sides the subject swings across through the centre. The portals chapter centres it.
+    // sides the subject swings across through the centre. The portals chapter centres it. On the
+    // landing screen the centred title sits over the middle, so the subject drops into the lower part.
     const wide = aspect > 1.2;
     const sideNow = THREE.MathUtils.lerp(sides[i] ?? 0, sides[i + 1] ?? 0, k);
-    const shift = wide ? 0.32 * Math.abs(sideNow) : 0.34 * (1 - clamp(f - (SHOTS.length - 2)));
-    const key = `${size.width}x${size.height}:${wide}:${shift.toFixed(3)}:${sideNow > 0}`;
+    const landing = 1 - smoother(clamp(f));
+    const sx = wide ? 0.32 * Math.abs(sideNow) : 0;
+    const ox = sideNow > 0 ? sx : 0;
+    // vertical: >0 renders the top of a taller view (subject lower), the phone story cards the bottom of one (subject higher)
+    const sy = wide ? 0.25 * landing : 0.34 * (1 - clamp(f - (SHOTS.length - 2)));
+    const oy = wide ? 0 : sy * (1 - landing);
+    const key = `${size.width}x${size.height}:${sx.toFixed(3)}:${ox.toFixed(3)}:${sy.toFixed(3)}:${oy.toFixed(3)}`;
     if (key !== st.view) {
       st.view = key;
-      if (shift < 1e-3) cam.clearViewOffset();
-      else if (wide) cam.setViewOffset(Math.round(size.width * (1 + shift)), size.height, sideNow > 0 ? Math.round(size.width * shift) : 0, 0, size.width, size.height);
-      else cam.setViewOffset(size.width, Math.round(size.height * (1 + shift)), 0, Math.round(size.height * shift), size.width, size.height);
+      if (sx < 1e-3 && sy < 1e-3) cam.clearViewOffset();
+      else cam.setViewOffset(Math.round(size.width * (1 + sx)), Math.round(size.height * (1 + sy)), Math.round(size.width * ox), Math.round(size.height * oy), size.width, size.height);
     } else if (fovChanged) cam.updateProjectionMatrix();
   });
   return null;
@@ -272,7 +282,7 @@ function phoneTexture() {
 
 // ---------------------------------------------------------------- the model and its moving parts
 
-const NO_SHADOW = new Set(["Skyline", "Skyline_spires", "District_buildings", "District_roofs", "Trees", "LightPools", "Ground"]);
+const NO_SHADOW = new Set(["Trees", "LightPools", "Ground"]);
 
 function World({ chapter, truckState }: { chapter: P; truckState: MutableRefObject<{ pos: THREE.Vector3; deg: number }> }) {
   const { scene } = useGLTF(MODEL);
@@ -304,16 +314,34 @@ function World({ chapter, truckState }: { chapter: P; truckState: MutableRefObje
     pools.polygonOffsetFactor = -2;
     const screen = phoneTexture();
     (get("PhoneScreen") as THREE.Mesh).material = new THREE.MeshBasicMaterial({ map: screen, toneMapped: false, side: THREE.DoubleSide });
-    return { hauler: get("Hauler"), haloA: get("Halo_a"), haloB: get("Halo_b"), spin: get("Retailer_spin"), beacon: get("Regulator_beacon") as THREE.Mesh };
+    // The hauler gets its own copies of its materials (the buildings share them) so it can fade in on
+    // the landing loop. A dithered fade (alphaHash) needs no sorting against the rest of the scene.
+    const fade: THREE.MeshStandardMaterial[] = [];
+    get("Hauler").traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (!m.isMesh) return;
+      const c = (m.material as THREE.MeshStandardMaterial).clone();
+      c.alphaHash = true;
+      m.material = c;
+      fade.push(c);
+    });
+    return { hauler: get("Hauler"), fade, haloA: get("Halo_a"), haloB: get("Halo_b"), spin: get("Retailer_spin"), beacon: get("Regulator_beacon") as THREE.Mesh };
   }, [scene]);
 
   const st = useMemo(() => ({ deg: TRUCK[0], speed: 0 }), []);
   useFrame(({ clock }, dt) => {
     dt = Math.min(dt, 0.1);
     const t = clock.elapsedTime;
-    const goal = sample(TRUCK, clamp(chapter.current, 0, TRUCK.length - 1));
+    // On the landing screen the hauler cruises round a stretch of the ring through the factory's arch,
+    // over and over (it jumps back while out of shot). Scrolling hands it over to the story.
+    const hero = 1 - clamp(chapter.current * 1.5);
+    const cruise = HERO_LOOP[0] + ((t * HERO_SPEED) % (HERO_LOOP[1] - HERO_LOOP[0]));
+    const goal = THREE.MathUtils.lerp(sample(TRUCK, clamp(chapter.current, 0, TRUCK.length - 1)), cruise, hero);
     const before = st.deg;
-    st.deg += (goal - st.deg) * (1 - Math.exp(-dt * 2.4));
+    if (hero > 0.999) st.deg = cruise;
+    else st.deg += (goal - st.deg) * (1 - Math.exp(-dt * 2.4));
+    const opacity = THREE.MathUtils.lerp(1, clamp((st.deg - HERO_LOOP[0]) / HERO_FADE), hero);
+    if (parts.fade[0] && Math.abs(parts.fade[0].opacity - opacity) > 1e-3) parts.fade.forEach((m) => (m.opacity = opacity));
     st.speed = (st.deg - before) / Math.max(dt, 1e-3);
     const h = parts.hauler;
     ring(R_ROAD, st.deg, 0.35 + Math.sin(t * 9) * 0.015 * Math.min(1, Math.abs(st.speed)), h.position);
@@ -538,9 +566,9 @@ function Labels({ chapter }: { chapter: P }) {
     ["Regulator", COLORS.regulator, new THREE.Vector3(0, 44, 0)],
   ];
   const refs = useRef<Array<HTMLDivElement | null>>([]);
-  // Hide the floating labels once the portal cards scroll in on top of the scene.
+  // Hide the floating labels on the landing shot, and once the portal cards scroll in on top.
   useFrame(() => {
-    const o = String(clamp(1 - (chapter.current - (SHOTS.length - 2)) * 2));
+    const o = String(clamp(chapter.current * 2) * clamp(1 - (chapter.current - (SHOTS.length - 2)) * 2));
     refs.current.forEach((el) => el && el.style.opacity !== o && (el.style.opacity = o));
   });
   return (
@@ -572,6 +600,132 @@ function Sky() {
     <mesh material={mat}>
       <sphereGeometry args={[480, 32, 16]} />
     </mesh>
+  );
+}
+
+// ---------------------------------------------------------------- the data grid around the island
+
+const R_ISLAND = 64; // as in the Blender script
+
+/** A glowing grid on the dark floor around the island, fading out with distance, with scan pulses
+ * rippling outwards from the ring. */
+function DataGrid() {
+  const mat = useMemo(
+    () =>
+      new THREE.ShaderMaterial({
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        toneMapped: false,
+        uniforms: { uTime: { value: 0 }, uNear: { value: new THREE.Color("#02C39A") }, uFar: { value: new THREE.Color("#2fa9d8") } },
+        vertexShader: "varying vec3 vW; void main(){ vec4 w = modelMatrix * vec4(position, 1.0); vW = w.xyz; gl_Position = projectionMatrix * viewMatrix * w; }",
+        fragmentShader: `
+          uniform float uTime; uniform vec3 uNear; uniform vec3 uFar; varying vec3 vW;
+          float grid(vec2 p, float size) {
+            vec2 q = p / size;
+            vec2 g = abs(fract(q - 0.5) - 0.5) / fwidth(q);
+            return 1.0 - min(min(g.x, g.y), 1.0);
+          }
+          void main() {
+            vec2 p = vW.xz;
+            float r = length(p);
+            float lines = grid(p, 8.0) * 0.55 + grid(p, 2.0) * 0.12;
+            float w = fract((r - uTime * 16.0) / 110.0);
+            float pulse = smoothstep(0.0, 0.015, w) * (1.0 - smoothstep(0.015, 0.07, w));
+            float fade = smoothstep(${R_ISLAND}.0, ${R_ISLAND + 10}.0, r) * (1.0 - smoothstep(120.0, 330.0, r));
+            vec3 col = mix(uNear, uFar, clamp((r - ${R_ISLAND}.0) / 180.0, 0.0, 1.0));
+            gl_FragColor = vec4(col * (0.7 + pulse * 2.2), (lines + pulse * (0.25 + lines)) * fade);
+          }`,
+      }),
+    [],
+  );
+  useFrame(({ clock }) => void (mat.uniforms.uTime.value = clock.elapsedTime));
+  return (
+    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.05, 0]} material={mat}>
+      <ringGeometry args={[R_ISLAND, 340, 128, 1]} />
+    </mesh>
+  );
+}
+
+// Distant hubs the data flows out to: [ring angle in degrees, radius, colour].
+const HUBS: Array<[number, number, string]> = [
+  [12, 190, "#4FC3F7"], [52, 235, "#02C39A"], [84, 165, "#8E7CC3"], [140, 215, "#4FC3F7"], [168, 250, "#02C39A"],
+  [196, 175, "#E8A33D"], [238, 225, "#4FC3F7"], [268, 160, "#02C39A"], [322, 240, "#D96C6C"], [346, 200, "#02C39A"],
+];
+const PULSES = 3; // per link
+
+/** Lines of light from the island's rim out to the hubs, with pulses of data running outwards. */
+function DataLinks() {
+  const links = useMemo(
+    () =>
+      HUBS.map(([deg, r, color]) => {
+        const from = ring(R_ISLAND + 1, deg, 0.15);
+        const to = ring(r, deg, 0.15);
+        return { deg, r, color, from, to, len: from.distanceTo(to), mid: from.clone().lerp(to, 0.5) };
+      }),
+    [],
+  );
+  const pulses = useRef<THREE.InstancedMesh>(null);
+  const tops = useRef<Array<THREE.Mesh | null>>([]);
+  const m = useMemo(() => new THREE.Matrix4(), []);
+  const p = useMemo(() => new THREE.Vector3(), []);
+  useEffect(() => {
+    const c = new THREE.Color();
+    links.forEach((l, i) => {
+      for (let j = 0; j < PULSES; j++) pulses.current?.setColorAt(i * PULSES + j, c.set(l.color).lerp(new THREE.Color("#ffffff"), 0.5));
+    });
+    if (pulses.current?.instanceColor) pulses.current.instanceColor.needsUpdate = true;
+  }, [links]);
+  useFrame(({ clock }) => {
+    const t = clock.elapsedTime;
+    links.forEach((l, i) => {
+      for (let j = 0; j < PULSES; j++) {
+        const u = (t * 0.09 * (190 / l.len) + j / PULSES + i * 0.137) % 1;
+        p.copy(l.from).lerp(l.to, u).setY(0.6);
+        const s = Math.sin(Math.PI * u); // grow out of the rim, shrink into the hub
+        m.makeScale(s, s, s).setPosition(p);
+        pulses.current?.setMatrixAt(i * PULSES + j, m);
+      }
+      const top = tops.current[i];
+      if (top) top.scale.setScalar(1 + 0.25 * Math.sin(t * 2 + i));
+    });
+    if (pulses.current) pulses.current.instanceMatrix.needsUpdate = true;
+  });
+  return (
+    <group>
+      {links.map((l, i) => (
+        <group key={i}>
+          {/* the link: a flat glowing strip on the floor */}
+          <mesh position={l.mid} rotation={[0, THREE.MathUtils.degToRad(l.deg), 0]}>
+            <boxGeometry args={[l.len, 0.04, 0.35]} />
+            <meshBasicMaterial color={l.color} transparent opacity={0.55} depthWrite={false} blending={THREE.AdditiveBlending} toneMapped={false} />
+          </mesh>
+          {/* the hub: a dark pylon with a glowing crown, a ring of light round its foot, and a faint beam */}
+          <group position={l.to}>
+            <mesh position={[0, 7, 0]}>
+              <cylinderGeometry args={[0.35, 0.9, 14, 12]} />
+              <meshStandardMaterial color="#0b141c" roughness={0.4} metalness={0.8} />
+            </mesh>
+            <mesh ref={(x) => void (tops.current[i] = x)} position={[0, 14.8, 0]}>
+              <octahedronGeometry args={[1.5, 0]} />
+              <meshBasicMaterial color={l.color} toneMapped={false} />
+            </mesh>
+            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.12, 0]}>
+              <ringGeometry args={[3.2, 3.7, 48]} />
+              <meshBasicMaterial color={l.color} transparent opacity={0.8} toneMapped={false} />
+            </mesh>
+            <mesh position={[0, 45, 0]}>
+              <cylinderGeometry args={[0.25, 1.4, 60, 12, 1, true]} />
+              <meshBasicMaterial color={l.color} transparent opacity={0.12} depthWrite={false} blending={THREE.AdditiveBlending} side={THREE.DoubleSide} toneMapped={false} />
+            </mesh>
+          </group>
+        </group>
+      ))}
+      <instancedMesh ref={pulses} args={[undefined, undefined, HUBS.length * PULSES]}>
+        <sphereGeometry args={[0.55, 12, 12]} />
+        <meshBasicMaterial toneMapped={false} />
+      </instancedMesh>
+    </group>
   );
 }
 
@@ -616,7 +770,11 @@ export default function Story({ progress, sides }: { progress: P; sides: number[
       <World chapter={progress} truckState={truckState} />
       <Labels chapter={progress} />
       <Sparkles count={low ? 60 : 160} scale={[120, 30, 120]} position={[0, 14, 0]} size={3} speed={0.3} opacity={0.5} color="#9ff0e0" />
+      {/* data motes drifting over the grid */}
+      <Sparkles count={low ? 140 : 360} scale={[520, 70, 520]} position={[0, 30, 0]} size={5} speed={0.25} opacity={0.55} color="#7fe9ff" />
       <Ground low={low} />
+      <DataGrid />
+      <DataLinks />
       <CameraRig chapter={progress} sides={sides} truckState={truckState} />
       <EffectComposer multisampling={low ? 0 : 4}>
         <Bloom mipmapBlur intensity={1.1} luminanceThreshold={0.62} luminanceSmoothing={0.3} />

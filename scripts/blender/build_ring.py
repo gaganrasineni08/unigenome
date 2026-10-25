@@ -1,9 +1,10 @@
 """Builds the home page's 3D centrepiece in Blender and exports it to public/models/ring.glb.
 
-A neon ring road through a city at night. Four checkpoints stand on the outside of the ring
+A neon ring road on an island at night. Four checkpoints stand on the outside of the ring
 (factory, warehouse, retailer, buyer), each with a scanner arch over the road; the regulator's
-tower stands in the middle. Around the ring there are city blocks, avenues and streetlights with
-pools of light, then a skyline. The cargo hauler is exported at the origin; the page drives it.
+tower stands in the middle. Streetlights with pools of light and trees line the road, and a neon
+rim edges the island; the page draws the data grid around it. The cargo hauler is exported at the
+origin; the page drives it.
 
 Run with Blender:   blender -b -P scripts/blender/build_ring.py
 or the bpy module:  python scripts/blender/build_ring.py      (pip install bpy)
@@ -11,7 +12,7 @@ or the bpy module:  python scripts/blender/build_ring.py      (pip install bpy)
 Blender is Z-up; the glTF exporter turns that into three.js's Y-up, so a Blender point (x, y, z)
 lands at (x, z, -y) on the page. The ring sits in Blender's XY plane, centred on the origin.
 Object names the page looks up are kept stable: Hauler, CartonQR_a/b, PhoneScreen, Halo_a/b,
-Retailer_spin, Regulator_beacon, Skyline, Arch_<checkpoint>, CP_<checkpoint>.
+Retailer_spin, Regulator_beacon, LightPools, Arch_<checkpoint>, CP_<checkpoint>.
 """
 import math
 import os
@@ -19,13 +20,14 @@ import random
 
 import bpy  # noqa: I001  (bpy first: as a pip module it is what makes bmesh importable)
 import bmesh
-from mathutils import Matrix, Vector
+from mathutils import Vector
 
 OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "public", "models", "ring.glb")
 
 R_ROAD = 32.0  # centre line of the road
 ROAD_W = 9.0
 R_CHECK = 48.0  # where the checkpoint buildings stand
+R_ISLAND = 64.0  # the edge of the island everything stands on
 NEON_SCALE = 0.45  # one knob for the brightness of every neon part
 # Checkpoint angles in degrees; the hauler drives anticlockwise, so it meets them in this order.
 CHECKPOINTS = {"factory": 210, "warehouse": 300, "retailer": 30, "buyer": 120}
@@ -81,7 +83,6 @@ ASPHALT = mat("asphalt", (0.022, 0.025, 0.032), rough=0.5, metal=0.25)
 GLASS = mat("glass_dark", (0.015, 0.04, 0.06), rough=0.04, metal=0.7)
 RUBBER = mat("rubber", (0.02, 0.02, 0.02), rough=0.9)
 CARDBOARD = mat("cardboard", (0.72, 0.38, 0.14), rough=0.75)
-GRASS = mat("grass_night", (0.02, 0.07, 0.05), rough=0.95)
 LEAF = mat("leaf", (0.03, 0.16, 0.1), rough=0.8)
 BARK = mat("bark", (0.08, 0.05, 0.03), rough=0.9)
 PAINT_LINE = mat("road_paint", (0.75, 0.75, 0.72), rough=0.6, emit=(0.8, 0.8, 0.75), strength=0.25)
@@ -248,58 +249,7 @@ def ang_dist(a, b):
     return abs((a - b + 180) % 360 - 180)
 
 
-def near_checkpoint(deg, r, pad=20):
-    """True where the checkpoint grounds are (so the city leaves room for them)."""
-    return any(ang_dist(deg, c) < pad and r < R_CHECK + 18 for c in CHECKPOINTS.values())
-
-
 # ------------------------------------------------------------------ textures
-
-
-def window_image():
-    """16 x 16 cells, one window each: lit warm, lit cool, or dark, with a slab edge between floors.
-    Cell (0, 0) is always dark; roofs map onto it."""
-    size, cells = 512, 16
-    img = bpy.data.images.new("windows", size, size, alpha=False)
-    px = [0.0] * (size * size * 4)
-    cs = size // cells
-    for cy in range(cells):
-        for cx in range(cells):
-            r = random.random()
-            if (cx == 0 and cy == 0) or r < 0.55:
-                col = (0.014, 0.018, 0.028)
-            elif r < 0.8:
-                col = (1.0, 0.74, 0.44)
-            elif r < 0.93:
-                col = (0.52, 0.84, 1.0)
-            else:
-                col = (0.35, 1.0, 0.82)
-            k0 = random.uniform(0.75, 1.0)  # lights differ a little from room to room
-            for y in range(cy * cs + 9, cy * cs + cs - 4):
-                for x in range(cx * cs + 4, cx * cs + cs - 4):
-                    i = (y * size + x) * 4
-                    px[i : i + 4] = (col[0] * k0, col[1] * k0, col[2] * k0, 1.0)
-    for i in range(3, len(px), 4):
-        px[i] = 1.0
-    img.pixels = px
-    img.pack()
-    return img
-
-
-def city_material():
-    m = bpy.data.materials.new("skyline")
-    m.use_nodes = True
-    nt = m.node_tree
-    p = nt.nodes["Principled BSDF"]
-    tex = nt.nodes.new("ShaderNodeTexImage")
-    tex.image = window_image()
-    tex.interpolation = "Closest"
-    p.inputs["Base Color"].default_value = (0.035, 0.04, 0.055, 1)
-    p.inputs["Roughness"].default_value = 0.35
-    p.inputs["Metallic"].default_value = 0.6
-    nt.links.new(tex.outputs["Color"], p.inputs["Emission Color"])
-    p.inputs["Emission Strength"].default_value = 1.3
-    return m
 
 
 def pool_material():
@@ -333,27 +283,7 @@ def pool_material():
     return m
 
 
-CITY = city_material()
 POOL = pool_material()
-
-
-def city_block(bm, uvl, cx, cy, w, d, h, rot):
-    """Adds a building to `bm`: sometimes stepped back once or twice as it rises."""
-    tiers = 1 if h < 18 else random.choice((1, 2, 2, 3))
-    z = 0.0
-    ou, ov = random.randint(0, 7) / 8, random.randint(0, 7) / 8
-    for t in range(tiers):
-        th = h / tiers if t < tiers - 1 else h - z
-        geom = bmesh.ops.create_cube(bm, size=1.0)
-        vs = geom["verts"]
-        bmesh.ops.scale(bm, vec=(w, d, th), verts=vs)
-        bmesh.ops.rotate(bm, verts=vs, cent=(0, 0, 0), matrix=Matrix.Rotation(rot, 3, "Z"))
-        bmesh.ops.translate(bm, vec=(cx, cy, z + th / 2), verts=vs)
-        z += th
-        w *= random.uniform(0.62, 0.82)
-        d *= random.uniform(0.62, 0.82)
-    bm.normal_update()
-    return z, w, d, ou, ov
 
 
 # ------------------------------------------------------------------ ground, road and streetlights
@@ -364,14 +294,11 @@ def build_ground():
     # sidewalks either side of the ring, and the inner plaza
     parts.append(annulus("walk_in", R_ROAD - ROAD_W / 2 - 3.6, R_ROAD - ROAD_W / 2 - 0.6, 0.2, CONCRETE_LIGHT, thick=0.2))
     parts.append(annulus("walk_out", R_ROAD + ROAD_W / 2 + 0.6, R_ROAD + ROAD_W / 2 + 3.6, 0.2, CONCRETE_LIGHT, thick=0.2))
-    # the district outside the ring: dark city ground with radial avenues
-    parts.append(annulus("district", R_ROAD + ROAD_W / 2 + 3.6, 112, 0.04, CONCRETE, seg=160))
-    for k in range(8):
-        deg = k * 45 + 30  # through every checkpoint, and halfway between them
-        a = math.radians(deg)
-        parts.append(box(f"avenue{k}", (76, 7, 0.08), polar(R_ROAD + ROAD_W / 2 + 3.6 + 38, deg, 0.08), ASPHALT, rot=(0, 0, a)))
-        for s in (-1, 1):
-            parts.append(box(f"avenue{k}_line{s}", (76, 0.12, 0.02), Vector(polar(R_ROAD + ROAD_W / 2 + 3.6 + 38, deg, 0.13)) + Vector((-math.sin(a) * s * 3.2, math.cos(a) * s * 3.2, 0)), PAINT_LINE, rot=(0, 0, a)))
+    # the island the ring and its checkpoints stand on, edged with a neon rim; the page draws the
+    # glowing data grid around it
+    parts.append(annulus("island", R_ROAD + ROAD_W / 2 + 3.6, R_ISLAND, 0.04, CONCRETE, seg=192))
+    parts.append(annulus("island_edge", R_ISLAND - 0.5, R_ISLAND, 0.18, HULL_LIGHT, seg=192, thick=0.3))
+    parts.append(torus("island_rim", R_ISLAND + 0.1, 0.16, (0, 0, 0.22), neon("mint", COL["mint"], 8), seg=256, rseg=8))
     join("Ground", parts)
 
 
@@ -434,17 +361,6 @@ def build_streetlights():
         streetlight(f"lo{k}", polar(R_ROAD + ROAD_W / 2 + 1.6, deg), deg + 180, parts, glow, pools)
         if k % 2 == 0:
             streetlight(f"li{k}", polar(R_ROAD - ROAD_W / 2 - 1.6, deg + 5), deg + 5, parts, glow, pools)
-    # avenue lamps
-    for k in range(8):
-        deg = k * 45 + 30
-        a = math.radians(deg)
-        side = Vector((-math.sin(a), math.cos(a), 0))
-        for j, r in enumerate(range(48, 110, 12)):
-            if near_checkpoint(deg, r, pad=6):
-                continue
-            for s in (-1, 1):
-                p = Vector(polar(r + (6 if s > 0 else 0), deg)) + side * s * 4.4
-                streetlight(f"la{k}_{j}_{s}", p, deg + (90 if s < 0 else -90), parts, glow, pools, arm=1.4, h=6)
     join("Streetlights", parts)
     join("Lamps", glow)
     # pools of light on the ground under every lamp
@@ -745,111 +661,18 @@ def build_regulator():
     return g
 
 
-# ------------------------------------------------------------------ the city around the ring
+# ------------------------------------------------------------------ trees
 
 
-def build_district():
-    """Blocks of mid-rise buildings between the avenues, parks here and there, rooftop details."""
-    bm = bmesh.new()
-    uvl = bm.loops.layers.uv.new()
-    roof, crowns, parks = [], [], []
-    avenues = [k * 45 + 30 for k in range(8)]
-    for ring_r in (58, 72, 88, 102):
-        n = int(2 * math.pi * ring_r / 13)
-        for i in range(n):
-            deg = 360 * i / n + random.uniform(-2, 2)
-            if near_checkpoint(deg, ring_r, pad=22) or any(ang_dist(deg, a) < 360 * 6 / (2 * math.pi * ring_r) + 1 for a in avenues):
-                continue
-            x, y, _ = polar(ring_r + random.uniform(-2, 2), deg)
-            if random.random() < 0.12:
-                parks.append((x, y))
-                continue
-            w, d = random.uniform(6, 9), random.uniform(6, 9)
-            h = random.uniform(6, 14) + (ring_r - 58) * random.uniform(0.15, 0.4)
-            rot = math.radians(deg)
-            top, tw, td, ou, ov = city_block(bm, uvl, x, y, w, d, h, rot)
-            r = random.random()
-            if r < 0.35:
-                roof.append(box(f"ac{i}_{ring_r}", (1.4, 1.0, 0.7), (x + 1, y, top + 0.35), PANEL))
-                roof.append(box(f"ac2{i}_{ring_r}", (1.0, 1.0, 0.6), (x - 1.2, y + 0.8, top + 0.3), PANEL))
-            elif r < 0.6:
-                roof.append(cyl(f"tank{i}_{ring_r}", 0.8, 1.6, (x, y, top + 1.3), PANEL, seg=12))
-                for s in (-1, 1):
-                    roof.append(box(f"tankleg{i}_{ring_r}{s}", (0.1, 0.1, 0.6), (x + s * 0.5, y, top + 0.3), PANEL))
-            elif r < 0.8:
-                roof.append(cyl(f"ant{i}_{ring_r}", 0.05, 3.5, (x, y, top + 1.75), CHROME, seg=6))
-                crowns.append(sphere(f"antlight{i}_{ring_r}", 0.18, (x, y, top + 3.6), neon("red_tip", COL["red"], 14), seg=8, rings=6))
-            else:
-                crowns.append(box(f"crown{i}_{ring_r}", (tw + 0.1, td + 0.1, 0.25), (x, y, top - 0.6), neon(random.choice(("mint_soft", "sea_soft", "coral_soft")), COL[random.choice(("mint", "sea", "coral"))], 4), rot=(0, 0, rot)))
-    from_bmesh("District_buildings", bm, CITY)
-    uv_box(bpy.context.scene.objects["District_buildings"])
-    join("District_roofs", roof)
-    if crowns:
-        join("District_lights", crowns)
+def build_trees():
+    """Trees along the outer sidewalk, leaving the checkpoint grounds clear."""
     park = []
-    for k, (x, y) in enumerate(parks):
-        park.append(cyl(f"park{k}", 5, 0.3, (x, y, 0.15), GRASS, seg=24))
-        for j in range(4):
-            tree(f"park{k}_t{j}", (x + random.uniform(-3, 3), y + random.uniform(-3, 3), 0.3), park, random.uniform(0.8, 1.3))
-    # trees along the outer sidewalk
     for k in range(48):
         deg = k * 7.5 + 3
         if any(ang_dist(deg, c) < 16 for c in CHECKPOINTS.values()):
             continue
         tree(f"st{k}", polar(R_ROAD + ROAD_W / 2 + 4.6, deg), park, 0.8)
     join("Trees", park)
-
-
-def uv_box(ob):
-    """Window UVs for a mesh built from boxes (each face gets cells about one floor high)."""
-    bm = bmesh.new()
-    bm.from_mesh(ob.data)
-    uvl = bm.loops.layers.uv.verify()
-    bm.normal_update()
-    for f in bm.faces:
-        n = f.normal
-        key = hash((round(f.calc_center_median().x / 4), round(f.calc_center_median().y / 4)))
-        ou, ov = (key % 16) / 16, ((key // 16) % 16) / 16
-        for loop in f.loops:
-            co = loop.vert.co
-            if abs(n.z) > 0.5:
-                loop[uvl].uv = (0.01, 0.01)
-            else:
-                along = co.x * -n.y + co.y * n.x
-                loop[uvl].uv = (along / 20 + ou, co.z / 42 + ov)
-    bm.to_mesh(ob.data)
-    bm.free()
-
-
-def build_skyline():
-    """Taller towers further out: set-backs, crowns of light, a few spires and billboards."""
-    bm = bmesh.new()
-    bm.loops.layers.uv.new()
-    lights, spires = [], []
-    n = 0
-    while n < 230:
-        r = random.uniform(118, 220)
-        deg = random.uniform(0, 360)
-        w, d = random.uniform(7, 13), random.uniform(7, 13)
-        h = random.uniform(16, 40) * (1.0 + (r - 118) / 120)
-        if random.random() < 0.08:
-            h *= 1.7
-        x, y, _ = polar(r, deg)
-        rot = math.radians(random.uniform(0, 90))
-        top, tw, td, _, _ = city_block(bm, bm.loops.layers.uv.active, x, y, w, d, h, rot)
-        if h > 45 and random.random() < 0.6:
-            lights.append(box(f"sk_crown{n}", (tw + 0.2, td + 0.2, 0.4), (x, y, top - 1.2), neon(random.choice(("sea_soft", "mint_soft", "violet_soft")), COL[random.choice(("sea", "mint", "violet"))], 4), rot=(0, 0, rot)))
-        if h > 60 and random.random() < 0.6:
-            spires.append(cyl(f"sk_spire{n}", 0.4, 12, (x, y, top + 6), PANEL, seg=8, r2=0.05))
-            lights.append(sphere(f"sk_tip{n}", 0.35, (x, y, top + 12.2), neon("red_tip", COL["red"], 14), seg=8, rings=6))
-        if random.random() < 0.05:
-            ox, oy = math.cos(rot), math.sin(rot)
-            lights.append(box(f"sk_bill{n}", (0.3, tw * 0.8, tw * 0.45), (x - ox * (tw / 2 + 0.3), y - oy * (tw / 2 + 0.3), top * 0.7), neon(random.choice(("billboard", "violet", "mint")), random.choice((COL["coral"], COL["violet"], COL["mint"])), 3), rot=(0, 0, rot)))
-        n += 1
-    from_bmesh("Skyline", bm, CITY)
-    uv_box(bpy.context.scene.objects["Skyline"])
-    join("Skyline_lights", lights)
-    join("Skyline_spires", spires)
 
 
 # ------------------------------------------------------------------ the hauler (local +X is forward)
@@ -955,8 +778,7 @@ for key, deg in CHECKPOINTS.items():
     {"factory": build_factory, "warehouse": build_warehouse, "retailer": build_retailer, "buyer": build_buyer}[key](g)
     build_arch(key, deg, {"factory": COL["mint"], "warehouse": COL["sea"], "retailer": COL["amber"], "buyer": COL["violet"]}[key])
 build_regulator()
-build_district()
-build_skyline()
+build_trees()
 build_hauler()
 
 os.makedirs(os.path.dirname(OUT), exist_ok=True)

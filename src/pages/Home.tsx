@@ -15,7 +15,7 @@ const STEPS: Array<{ tag: string; title: string; body: string; side: number; col
     tag: "Anti-counterfeit for any product",
     title: "Every product gets a DNA it can't fake.",
     body: "UniGenome gives each item a signed QR identity, follows it from the factory to the shelf, and lets any buyer check it with a phone camera.",
-    side: -1,
+    side: 0, // the landing screen: the title is centred over the scene, not on a card
   },
   {
     tag: "1 · Manufacture",
@@ -136,9 +136,10 @@ export default function Home() {
         ) : (
           <div className="h-full w-full bg-[radial-gradient(circle_at_30%_20%,#0b4a50,#031b1e)]" />
         )}
-        {/* a soft shade behind whichever side the current card is on */}
-        <div className={`pointer-events-none absolute inset-0 bg-gradient-to-r from-[#01040a]/70 via-[#01040a]/10 to-transparent transition-opacity duration-700 ${STEPS[active]?.side === 1 ? "opacity-0" : "opacity-100"}`} />
+        {/* a soft shade behind whichever side the current card is on, or behind the centred title */}
+        <div className={`pointer-events-none absolute inset-0 bg-gradient-to-r from-[#01040a]/70 via-[#01040a]/10 to-transparent transition-opacity duration-700 ${STEPS[active]?.side === -1 ? "opacity-100" : "opacity-0"}`} />
         <div className={`pointer-events-none absolute inset-0 bg-gradient-to-l from-[#01040a]/70 via-[#01040a]/10 to-transparent transition-opacity duration-700 ${STEPS[active]?.side === 1 ? "opacity-100" : "opacity-0"}`} />
+        <div className={`pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_60%_45%_at_50%_45%,rgba(1,4,10,0.55),transparent)] transition-opacity duration-700 ${active === 0 ? "opacity-100" : "opacity-0"}`} />
       </div>
 
       <ChapterRail active={active} />
@@ -154,22 +155,42 @@ export default function Home() {
       </header>
 
       <main className="relative z-10">
-        {STEPS.map((s, i) => (
+        <section id="step-0" data-chapter className="flex min-h-[100svh] flex-col items-center justify-center px-4 pt-20 text-center">
+          <div ref={(el) => void (cards.current[0] = el)} className="hero-intro">
+            <div className="hero-eyebrow hero-in">
+              <span className="story-dot" />
+              {STEPS[0].tag}
+            </div>
+            <h1 className="hero-in mt-6 font-display text-5xl font-semibold leading-[1.02] tracking-tight sm:text-7xl lg:text-8xl" style={{ animationDelay: "0.12s" }}>
+              Every product gets a <span className="hero-dna">DNA</span> it can't fake.
+            </h1>
+            <p className="hero-in mx-auto mt-6 max-w-xl text-base leading-relaxed text-[#d3e3e8] sm:text-lg" style={{ animationDelay: "0.24s" }}>{STEPS[0].body}</p>
+            <div className="hero-in mt-8 flex flex-wrap justify-center gap-3" style={{ animationDelay: "0.36s" }}>
+              <Link to="/buyer"><Button>Scan a product</Button></Link>
+              <a href="#portals"><Button variant="soft">I work in the supply chain</Button></a>
+            </div>
+            <a href="#step-1" className="hero-in hero-scroll" style={{ animationDelay: "0.6s" }}>
+              <span>Scroll to ride along with a carton</span>
+              <i aria-hidden />
+            </a>
+          </div>
+        </section>
+        {STEPS.map((s, i) => i > 0 && (
           <section key={i} id={`step-${i}`} data-chapter className="flex min-h-[100svh] items-end px-4 pb-8 sm:items-center sm:pb-0">
             <div className={`mx-auto flex w-full max-w-6xl ${s.side === 1 ? "sm:justify-end" : ""}`}>
               <article
                 ref={(el) => void (cards.current[i] = el)}
                 onPointerMove={tilt}
                 onPointerLeave={untilt}
-                className={`story-card glass glass-strong w-full rounded-3xl p-6 sm:p-8 ${i === 0 ? "max-w-xl" : "max-w-md"}`}
+                className="story-card glass glass-strong w-full max-w-md rounded-3xl p-6 sm:p-8"
                 style={{ ["--accent" as string]: s.color ?? "#02C39A", ["--dir" as string]: s.side }}
               >
-                {i > 0 && <span className="story-num" aria-hidden>{String(i).padStart(2, "0")}</span>}
+                <span className="story-num" aria-hidden>{String(i).padStart(2, "0")}</span>
                 <div className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em]" style={{ color: s.color ?? "#02C39A" }}>
                   <span className="story-dot" />
                   {s.tag}
                 </div>
-                <h2 className={`font-display font-semibold leading-tight ${i === 0 ? "text-4xl sm:text-6xl" : "text-3xl sm:text-4xl"}`}>{s.title}</h2>
+                <h2 className="font-display text-3xl font-semibold leading-tight sm:text-4xl">{s.title}</h2>
                 <p className="mt-4 text-base leading-relaxed text-[#c9dbe0] sm:text-lg">{s.body}</p>
                 {s.facts && (
                   <div className="mt-5 flex flex-wrap gap-2">
@@ -178,14 +199,7 @@ export default function Home() {
                     ))}
                   </div>
                 )}
-                {i === 0 && (
-                  <div className="mt-6 flex flex-wrap gap-2">
-                    <Link to="/buyer"><Button>Scan a product</Button></Link>
-                    <a href="#portals"><Button variant="soft">I work in the supply chain</Button></a>
-                  </div>
-                )}
-                {i === 0 && <div className="mt-8 animate-bounce text-sm text-mute motion-reduce:animate-none">Scroll to ride along with a carton ↓</div>}
-                {i > 0 && <div className="story-bar" aria-hidden><i /></div>}
+                <div className="story-bar" aria-hidden><i /></div>
               </article>
             </div>
           </section>

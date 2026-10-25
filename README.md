@@ -69,7 +69,7 @@ shared/        code used by both the browser and the server
   events.ts    signed custody records and the hash chain
   geo.ts       haversine distance and travel speed
 server/        API (Hono), database schema, verdict and recall logic, demo data
-src/           React app: home page (3D ring road, src/three/Story.tsx), portals, DSA page
+src/           React app: home page (3D ring road, src/three/Story.tsx) and the portals
   lib/liquidGlass.ts  the refracting liquid-glass panels (SVG displacement map per panel size)
 public/models/ ring.glb, the home page's 3D model, built in Blender by scripts/blender/build_ring.py
 tests/         unit tests for every data structure (npm test)
