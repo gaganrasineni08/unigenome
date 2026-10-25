@@ -60,8 +60,8 @@ const SHOTS: Shot[] = [
   (tr, d) => [ring(R_ROAD - 10.5, d + 5, 4.6), tr.clone().setY(2.5), 32], // 2 carton QR, beside and a little ahead of the hauler
   (_, d) => [ring(R_ROAD + 1.5, d - 25, 5.5), ring(R_ROAD - 1, d + 16, 1.5), 50], // 3 chase, low behind the hauler
   (_, __, t) => [ring(9, 274 + Math.sin(t * 0.2) * 2, 15), ring(47, 300, 6), 44], // 4 warehouse
-  (_, __, t) => [ring(12, 50 + Math.sin(t * 0.2) * 2, 17), ring(47, 24, 8), 44], // 5 retailer, from past its arch so the gantry doesn't block the shop
-  (_, __, t) => [ring(19, 110 + Math.sin(t * 0.2) * 2, 10), ring(48, 121, 9), 36], // 6 the giant phone, over its arch
+  (_, __, t) => [ring(20, 70 + Math.sin(t * 0.2) * 2, 10), ring(47, 30, 5.5), 44], // 5 retailer, three-quarter view from well past its arch so the gantry's legs don't block the shop
+  (_, __, t) => [ring(12, 107 + Math.sin(t * 0.2) * 2, 9), ring(48, 119, 8.5), 44], // 6 the giant phone, over its arch, the whole screen in frame
   (_, __, t) => [ring(56, 160 + Math.sin(t * 0.08) * 10, 36), v(0, 24, 0), 44], // 7 the regulator's tower
   (_, __, t) => [ring(190, 212 + Math.sin(t * 0.05) * 10, 120), v(0, 0, 0), 46], // 8 pull back for the portals
 ];
