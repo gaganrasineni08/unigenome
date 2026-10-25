@@ -12,7 +12,8 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p .",
     "seed": "tsx server/seed-cli.ts --reset",
-    "walkthrough": "node scripts/walkthrough.mjs"
+    "walkthrough": "node scripts/walkthrough.mjs",
+    "e2e": "tsx scripts/e2e.ts"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.11",
