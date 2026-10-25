@@ -770,7 +770,7 @@ app.get("/dsa/overview", async (c) => {
   const d = await db();
   const cartons = await d.query("SELECT u.id FROM units u JOIN pack_links l ON l.parent = u.id WHERE u.kind = 'carton' GROUP BY u.id ORDER BY count(*) DESC, u.id LIMIT 20");
   const units = await d.query("SELECT id, kind FROM units WHERE kind <> 'item' ORDER BY created_at DESC LIMIT 1");
-  const anyItem = await d.query("SELECT e.unit AS id FROM events e JOIN units u ON u.id = e.unit WHERE u.kind = 'item' GROUP BY e.unit ORDER BY count(*) DESC, e.unit LIMIT 1");
+  const anyItem = await d.query("SELECT e.unit_id AS id FROM events e JOIN units u ON u.id = e.unit_id WHERE u.kind = 'item' GROUP BY e.unit_id ORDER BY count(*) DESC, e.unit_id LIMIT 1");
   const batches = await d.query("SELECT id FROM batches ORDER BY created_at DESC");
   const { ordered, array } = await alertHeap();
   const { g, rows } = await routeGraph();

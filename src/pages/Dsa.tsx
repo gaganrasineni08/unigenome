@@ -31,8 +31,9 @@ const Code = ({ children }: { children: ReactNode }) => <div className="mt-3 rou
 export default function DsaPage() {
   const [tab, setTab] = useState<string>(() => location.hash.slice(1) || "hash");
   const [o, setO] = useState<any>(null);
+  const [err, setErr] = useState<string | null>(null);
   useEffect(() => {
-    api("/dsa/overview", { auth: false }).then(setO);
+    api("/dsa/overview", { auth: false }).then(setO).catch((e) => setErr(e.message));
   }, []);
   useEffect(() => {
     history.replaceState(null, "", "#" + tab);
@@ -52,7 +53,7 @@ export default function DsaPage() {
             <button key={k} onClick={() => setTab(k)} className={`rounded-lg px-3 py-1.5 text-sm transition ${tab === k ? "bg-mint text-abyss font-semibold" : "bg-white/5 text-mute hover:text-ink"}`}>{l}</button>
           ))}
         </div>
-        {!o ? <Spinner /> : (
+        {err ? <Alert>Couldn't load the live data: {err}</Alert> : !o ? <Spinner /> : (
           <>
             {tab === "hash" && <HashDemo />}
             {tab === "sig" && <SigDemo />}
