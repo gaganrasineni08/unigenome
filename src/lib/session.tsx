@@ -15,6 +15,7 @@ export interface Party {
 
 export interface Me extends Party {
   publicKey: string;
+  reviewNote?: string | null;
   sites: Array<{ id: string; name: string; lat: number; lng: number }>;
 }
 

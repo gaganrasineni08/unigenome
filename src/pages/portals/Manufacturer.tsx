@@ -44,14 +44,13 @@ function Shell() {
         { to: "/manufacturer/labels", label: "4 · Labels" },
         { to: "/manufacturer/scan", label: "5 · Scan & dispatch" },
         { to: "/manufacturer/shipments", label: "Shipments" },
-        { to: "/manufacturer/partners", label: "Partners" },
+        { to: "/manufacturer/partners", label: "Staff" },
         { to: "/manufacturer/complaints", label: "Complaints" },
       ];
   return (
     <>
       <TopBar title={qa ? "Quality approver" : "Manufacturer"} color={COLOR} tabs={tabs} right={<SignOutButton />} />
       <Page>
-        {me!.status !== "approved" && <div className="mb-4"><Alert tone="amber">Your account is waiting for approval. You can look around, but you can't sign records yet.</Alert></div>}
         <Routes>
           {qa ? (
             <>
@@ -67,7 +66,7 @@ function Shell() {
               <Route path="labels" element={<Labels />} />
               <Route path="scan" element={<><H1 sub="Scan a carton or pallet, then dispatch it. Destination and dispatch date are signed into the record.">Scan and dispatch</H1><ScanAct allowed={["DISPATCHED", "STORED", "CONDITION", "UNPACKED", "RECEIVED"]} /></>} />
               <Route path="shipments" element={<Shipments />} />
-              <Route path="partners" element={<><H1 sub="Warehouses, retailers and your quality approvers register themselves. You approve them by signing their public key.">Partners</H1><Approvals /></>} />
+              <Route path="partners" element={<><H1 sub="Your quality approvers register themselves. You approve them by signing their public key. Warehouses and retailers are approved by the regulator.">Staff approvals</H1><Approvals /></>} />
               <Route path="complaints" element={<Complaints />} />
             </>
           )}

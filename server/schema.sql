@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS parties (
   org TEXT,                        -- for qa: the manufacturer it belongs to
   public_key TEXT NOT NULL,
   enc_key JSONB NOT NULL,          -- private key encrypted in the browser with the user's passphrase
-  status TEXT NOT NULL,            -- pending | approved | revoked
+  status TEXT NOT NULL,            -- pending | approved | rejected | revoked
   approved_by TEXT,
   approval_sig TEXT,
   created_at BIGINT NOT NULL
@@ -133,3 +133,8 @@ CREATE TABLE IF NOT EXISTS alerts (
   status TEXT NOT NULL,            -- open | closed
   dedupe TEXT UNIQUE
 );
+
+-- Company proofs for the network head's review (added after the first release, so existing databases get the columns too).
+ALTER TABLE parties ADD COLUMN IF NOT EXISTS proof JSONB;
+ALTER TABLE parties ADD COLUMN IF NOT EXISTS review_note TEXT;
+ALTER TABLE parties ADD COLUMN IF NOT EXISTS reviewed_at BIGINT;

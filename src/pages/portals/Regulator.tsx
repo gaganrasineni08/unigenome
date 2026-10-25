@@ -24,7 +24,7 @@ export default function RegulatorPortal() {
           { to: "/regulator/recall", label: "Recall" },
           { to: "/regulator/complaints", label: "Complaints" },
           { to: "/regulator/expiring", label: "Expiring" },
-          { to: "/regulator/approvals", label: "Approvals" },
+          { to: "/regulator/approvals", label: "New companies" },
           { to: "/regulator/parties", label: "Parties & keys" },
           { to: "/regulator/shipments", label: "Shipments" },
         ]}
@@ -35,7 +35,7 @@ export default function RegulatorPortal() {
           <Route path="recall" element={<Recall />} />
           <Route path="complaints" element={<Complaints />} />
           <Route path="expiring" element={<Expiring />} />
-          <Route path="approvals" element={<><H1 sub="You are the root of trust: approving a manufacturer means signing its public key.">Approvals</H1><Approvals /></>} />
+          <Route path="approvals" element={<><H1 sub="You are the head of the network. Every new manufacturer, warehouse and retailer waits here until you have checked its licence, GSTIN and documents. Approving means signing its public key.">New company registrations</H1><Approvals /></>} />
           <Route path="parties" element={<Parties />} />
           <Route path="shipments" element={<Shipments />} />
         </Routes>

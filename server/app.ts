@@ -7,6 +7,7 @@ import { dnaOf, encodePayload, verifyUnit, type ContainerFields, type ItemFields
 import { EVENT_TYPES, eventHash, verifyEvent, type EventBody } from "../shared/events";
 import { merkleProof, merkleRoot, buildLevels } from "../shared/dsa/merkle";
 import { haversineKm } from "../shared/geo";
+import { checkGstin } from "../shared/gstin";
 import { verifyChain } from "../shared/events";
 import { Graph, dijkstra } from "../shared/dsa/graph";
 import { db } from "./db";
@@ -69,16 +70,46 @@ app.post("/register", async (c) => {
     const m = (await d.query("SELECT id FROM parties WHERE id = $1 AND role = 'manufacturer'", [b.org]))[0];
     if (!m) bad("Pick the manufacturer this quality approver works for");
   }
+  const proof = b.role === "qa" ? null : cleanProof(b.proof);
   const prefix = { manufacturer: "M", qa: "Q", warehouse: "W", retailer: "R" }[b.role as "manufacturer"];
   const id = newId(prefix, 2);
   await d.query(
-    "INSERT INTO parties (id, handle, name, role, org, public_key, enc_key, status, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,'pending',$8)",
-    [id, b.handle, b.name.trim(), b.role, b.role === "qa" ? b.org : null, b.publicKey, JSON.stringify(b.encKey), now()],
+    "INSERT INTO parties (id, handle, name, role, org, public_key, enc_key, status, created_at, proof) VALUES ($1,$2,$3,$4,$5,$6,$7,'pending',$8,$9)",
+    [id, b.handle, b.name.trim(), b.role, b.role === "qa" ? b.org : null, b.publicKey, JSON.stringify(b.encKey), now(), proof && JSON.stringify(proof)],
   );
   await d.query("INSERT INTO sites (id, party_id, name, lat, lng) VALUES ($1,$2,$3,$4,$5)", [newId("S", 3), id, b.site.name, b.site.lat, b.site.lng]);
   (await indexes()).parties.set(id, { id, name: b.name.trim(), role: b.role, org: b.org ?? null, publicKey: b.publicKey, status: "pending" });
   return c.json({ id, status: "pending" });
 });
+
+/** Company proofs a new manufacturer, warehouse or retailer must give; the network head reviews them. */
+function cleanProof(p: any) {
+  if (!p || typeof p !== "object") bad("Company details and a proof document are required");
+  const str = (k: string, label: string, max = 200) => {
+    const v = String(p[k] ?? "").trim();
+    if (!v) bad(label + " is required");
+    if (v.length > max) bad(label + " is too long");
+    return v;
+  };
+  const out: any = {
+    licenceNo: str("licenceNo", "Licence number", 40).toUpperCase(),
+    gstin: str("gstin", "GSTIN", 15).toUpperCase(),
+    address: str("address", "Address", 300),
+    contactName: str("contactName", "Contact person", 80),
+    phone: str("phone", "Phone", 20),
+    email: str("email", "Email", 120),
+    website: String(p.website ?? "").trim().slice(0, 120) || null,
+  };
+  if (!/^[+0-9 ()-]{8,20}$/.test(out.phone)) bad("Phone number looks wrong");
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(out.email)) bad("Email looks wrong");
+  const doc = p.doc;
+  if (!doc?.data) bad("Attach your licence or registration certificate");
+  const m = /^data:(image\/(png|jpeg|webp|svg\+xml)|application\/pdf);base64,/.exec(String(doc.data));
+  if (!m) bad("The document must be a PDF, PNG, JPG or WebP file");
+  if (String(doc.data).length > 4_000_000) bad("The document must be under 3 MB");
+  out.doc = { name: String(doc.name ?? "document").slice(0, 100), type: m![1], data: String(doc.data) };
+  return out;
+}
 
 /** Step 1 of sign-in: the encrypted key (only the user's passphrase can open it) and a one-time challenge. */
 app.post("/auth/challenge", async (c) => {
@@ -130,18 +161,53 @@ const requireRole = (role: string, ...roles: string[]) => {
 authed.get("/me", async (c) => {
   const me = c.get("party");
   const p = (await indexes()).parties.get(me.id)!;
-  return c.json({ ...me, status: p.status, publicKey: p.publicKey, sites: await sitesOf(me.id) });
+  const d = await db();
+  const note = (await d.query("SELECT review_note FROM parties WHERE id = $1", [me.id]))[0]?.review_note ?? null;
+  return c.json({ ...me, status: p.status, reviewNote: note, publicKey: p.publicKey, sites: await sitesOf(me.id) });
 });
 
-/** Approvals: the regulator approves manufacturers; a manufacturer (or the regulator) approves everyone else. */
+/**
+ * Approvals. The regulator is the head of the network: it reviews every new manufacturer, warehouse and
+ * retailer, with their proofs, and approves or rejects them. A manufacturer approves only its own quality approvers.
+ */
+const canReview = (me: { id: string; role: string }, target: { role: string; org?: string | null }) =>
+  me.role === "regulator" || (me.role === "manufacturer" && target.role === "qa" && target.org === me.id);
+
 authed.get("/approvals", async (c) => {
   const me = c.get("party");
   const d = await db();
-  const rows = await d.query("SELECT id, handle, name, role, org, public_key, created_at FROM parties WHERE status = 'pending' ORDER BY created_at");
-  const mine = rows.filter((r) =>
-    me.role === "regulator" ? true : me.role === "manufacturer" ? r.role !== "manufacturer" && (r.role !== "qa" || r.org === me.id) : false,
+  const rows = (await d.query(
+    "SELECT p.id, p.handle, p.name, p.role, p.org, p.public_key, p.created_at, p.proof, s.name AS site_name, s.lat, s.lng FROM parties p LEFT JOIN sites s ON s.party_id = p.id WHERE p.status = 'pending' ORDER BY p.created_at",
+  )).filter((r) => canReview(me, r));
+  const others = await d.query("SELECT id, name, proof->>'licenceNo' AS lic, proof->>'gstin' AS gstin FROM parties WHERE proof IS NOT NULL");
+  return c.json(
+    rows.map((r) => {
+      const p = r.proof;
+      const checks: Array<{ ok: boolean; label: string; detail?: string }> = [];
+      if (p) {
+        const g = checkGstin(p.gstin);
+        checks.push({ ok: g.ok, label: "GSTIN format and check digit", detail: g.ok ? `${g.state} · PAN ${g.pan}` : g.reason });
+        const dupL = others.find((o) => o.id !== r.id && o.lic === p.licenceNo);
+        const dupG = others.find((o) => o.id !== r.id && o.gstin === p.gstin);
+        checks.push({ ok: !dupL, label: "Licence number not used by another company", detail: dupL ? "also used by " + dupL.name : undefined });
+        checks.push({ ok: !dupG, label: "GSTIN not used by another company", detail: dupG ? "also used by " + dupG.name : undefined });
+        checks.push({ ok: !!p.doc, label: "Licence document attached", detail: p.doc?.name });
+      }
+      checks.push({ ok: r.lat != null, label: "Site location given", detail: r.site_name ?? undefined });
+      const { doc, ...rest } = p ?? {};
+      return { ...r, proof: p ? { ...rest, doc: doc ? { name: doc.name, type: doc.type } : null } : null, checks };
+    }),
   );
-  return c.json(mine);
+});
+
+/** The proof document itself, only for whoever reviews the account. */
+authed.get("/approvals/:id/doc", async (c) => {
+  const me = c.get("party");
+  const d = await db();
+  const r = (await d.query("SELECT role, org, proof FROM parties WHERE id = $1", [c.req.param("id")]))[0];
+  if (!r || !canReview(me, r)) bad("Not found", 404);
+  if (!r.proof?.doc) bad("No document", 404);
+  return c.json(r.proof.doc);
 });
 
 authed.post("/approvals/:id", async (c) => {
@@ -151,14 +217,28 @@ authed.post("/approvals/:id", async (c) => {
   const ix = await indexes();
   const target = ix.parties.get(c.req.param("id"));
   if (!target || target.status !== "pending") bad("Nothing to approve", 404);
-  const allowed = me.role === "regulator" || (me.role === "manufacturer" && target!.role !== "manufacturer" && (target!.role !== "qa" || target!.org === me.id));
-  if (!allowed) bad("You can't approve this account", 403);
+  if (!canReview(me, target!)) bad("Only the regulator can approve companies", 403);
   // The endorsement: the approver signs the new party's id, role and public key.
   const body = { party: target!.id, role: target!.role, publicKey: target!.publicKey };
   if (!verifyMessage("UG/endorse", body, sig, ix.parties.get(me.id)!.publicKey)) bad("Endorsement signature is invalid", 401);
   const d = await db();
-  await d.query("UPDATE parties SET status = 'approved', approved_by = $1, approval_sig = $2 WHERE id = $3", [me.id, sig, target!.id]);
+  await d.query("UPDATE parties SET status = 'approved', approved_by = $1, approval_sig = $2, reviewed_at = $3 WHERE id = $4", [me.id, sig, now(), target!.id]);
   target!.status = "approved";
+  return c.json({ ok: true });
+});
+
+authed.post("/approvals/:id/reject", async (c) => {
+  const me = c.get("party");
+  await requireApproved(me.id);
+  const { reason } = await c.req.json();
+  if (!String(reason ?? "").trim()) bad("Say why, so the company can fix it");
+  const ix = await indexes();
+  const target = ix.parties.get(c.req.param("id"));
+  if (!target || target.status !== "pending") bad("Nothing to reject", 404);
+  if (!canReview(me, target!)) bad("Only the regulator can review companies", 403);
+  const d = await db();
+  await d.query("UPDATE parties SET status = 'rejected', review_note = $1, approved_by = $2, reviewed_at = $3 WHERE id = $4", [String(reason).trim().slice(0, 500), me.id, now(), target!.id]);
+  target!.status = "rejected";
   return c.json({ ok: true });
 });
 

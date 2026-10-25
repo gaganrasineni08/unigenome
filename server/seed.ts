@@ -2,6 +2,7 @@
 // the app uses, so every record passes the same checks. Run with `npm run seed` or the button on the home page.
 import { randomBytes, toHex } from "../shared/bytes";
 import { generateKeyPair, signMessage } from "../shared/crypto";
+import { gstinCheckChar } from "../shared/gstin";
 import { encryptSecretKey } from "../shared/keystore";
 import { encodePayload, signUnit, type ContainerFields, type ItemFields } from "../shared/identity";
 import { signEvent, type EventBody, type EventType } from "../shared/events";
@@ -61,6 +62,24 @@ export async function seedDemo(opts: { reset?: boolean } = {}) {
   }
 }
 
+/** Demo company proofs: a valid-looking GSTIN (correct check digit) and a generated licence certificate image. */
+function demoProof(name: string, role: string, state: string, n: number) {
+  const pan = "AAB" + "CDEFGHJKLM"[n % 10] + "PQRSTUVWXY"[(n * 3) % 10] + String(1000 + n * 37).slice(-4) + "ABCDEFGHJK"[n % 10];
+  const g14 = state + pan + "1Z";
+  const gstin = g14 + gstinCheckChar(g14);
+  const kind = role === "manufacturer" ? "Form 25 · Manufacturing licence" : role === "warehouse" ? "Form 20B/21B · Wholesale drug licence" : "Form 20/21 · Retail drug licence";
+  const licenceNo = `${state === "27" ? "MH" : "TS"}/${role === "manufacturer" ? "MFG" : role === "warehouse" ? "WSL" : "RTL"}/2024/${String(100 + n * 7).padStart(4, "0")}`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="800" height="560" viewBox="0 0 800 560"><rect width="800" height="560" fill="#fbf8ef"/><rect x="20" y="20" width="760" height="520" fill="none" stroke="#2b6f6a" stroke-width="6"/><rect x="34" y="34" width="732" height="492" fill="none" stroke="#2b6f6a" stroke-width="1.5"/><text x="400" y="100" font-family="Georgia,serif" font-size="30" text-anchor="middle" fill="#123">Drug Control Administration (demo)</text><text x="400" y="140" font-family="Georgia,serif" font-size="20" text-anchor="middle" fill="#456">${kind}</text><text x="80" y="220" font-family="Georgia,serif" font-size="20" fill="#123">Licensee: ${name.replace(/&/g, "and")}</text><text x="80" y="265" font-family="Georgia,serif" font-size="20" fill="#123">Licence No: ${licenceNo}</text><text x="80" y="310" font-family="Georgia,serif" font-size="20" fill="#123">GSTIN: ${gstin}</text><text x="80" y="355" font-family="Georgia,serif" font-size="20" fill="#123">Valid until: 31-03-2029</text><circle cx="640" cy="430" r="58" fill="none" stroke="#b33" stroke-width="4"/><text x="640" y="437" font-family="Georgia,serif" font-size="16" text-anchor="middle" fill="#b33">SEAL</text><text x="80" y="470" font-family="Georgia,serif" font-size="14" fill="#789">Sample document generated for the UniGenome demo.</text></svg>`;
+  return {
+    licenceNo, gstin,
+    address: `Plot ${n * 4 + 12}, Industrial Area, ${state === "27" ? "Maharashtra" : "Telangana"}`,
+    contactName: ["Ravi Kumar", "Anita Desai", "Suresh Rao", "Priya Nair", "Imran Khan", "Meena Iyer", "Vikram Shah"][n % 7],
+    phone: `+91 98${String(48000000 + n * 1234567).slice(0, 8)}`,
+    email: `compliance${n}@example.in`,
+    doc: { name: "licence-certificate.svg", data: "data:image/svg+xml;base64," + Buffer.from(svg).toString("base64") },
+  };
+}
+
 async function run() {
   const d = await db();
   const t0 = Date.now() - 10 * DAY;
@@ -74,6 +93,7 @@ async function run() {
   );
   await d.query("INSERT INTO sites (id, party_id, name, lat, lng) VALUES ('S-REG','G-CDSCO','Authority office, Hyderabad',17.4065,78.4772)");
   resetIndexes();
+  const reg_sk = () => reg.secretKey;
   const regTok = await login({ handle: "regulator", name: "", role: "regulator", sk: reg.secretKey, pk: reg.publicKey });
 
   const people: Array<[string, string, string, string, number, number, string?]> = [
@@ -86,28 +106,30 @@ async function run() {
     ["andheri", "Wellness Chemists, Andheri", "retailer", "Andheri store", 19.1136, 72.8697],
   ];
   const A: Record<string, Actor> = {};
+  let n = 0;
   for (const [handle, name, role, siteName, lat, lng, orgHandle] of people) {
     const k = generateKeyPair();
     const reg = await call("POST", "/register", {
       handle, name, role, org: orgHandle ? A[orgHandle].id : undefined,
       publicKey: k.publicKey, encKey: await encryptSecretKey(k.secretKey, DEMO_PASSPHRASE), site: { name: siteName, lat, lng },
+      proof: role === "qa" ? undefined : demoProof(name, role, lat > 18 ? "27" : "36", ++n),
     });
-    // Manufacturers are endorsed by the regulator; everyone else by the manufacturer.
-    const approver = role === "manufacturer" ? { sk: reg.secretKey ?? "", tok: regTok.token } : null;
+    // The regulator (head of the network) approves companies; a manufacturer approves its own quality approvers.
     const endorse = { party: reg.id, role, publicKey: k.publicKey };
-    if (role === "manufacturer") {
-      const regSk = (await regKey()).sk;
-      await call("POST", `/approvals/${reg.id}`, { sig: signMessage("UG/endorse", endorse, regSk) }, regTok.token);
-    } else {
-      await call("POST", `/approvals/${reg.id}`, { sig: signMessage("UG/endorse", endorse, A.sunpharma.sk) }, A.sunpharma.token);
-    }
-    void approver;
+    if (role === "qa") await call("POST", `/approvals/${reg.id}`, { sig: signMessage("UG/endorse", endorse, A.sunpharma.sk) }, A.sunpharma.token);
+    else await call("POST", `/approvals/${reg.id}`, { sig: signMessage("UG/endorse", endorse, reg_sk()) }, regTok.token);
     const { token } = await login({ handle, name, role, sk: k.secretKey, pk: k.publicKey });
     const site = (await d.query("SELECT * FROM sites WHERE party_id = $1", [reg.id]))[0];
     A[handle] = { id: reg.id, handle, name, role, sk: k.secretKey, pk: k.publicKey, token, site: { id: site.id, name: site.name, lat: site.lat, lng: site.lng } };
   }
-  async function regKey() {
-    return { sk: reg.secretKey };
+
+  // Two companies still waiting for the regulator, to show the review screen: one clean, one with problems.
+  for (const [handle, name, role, siteName, lat, lng, proof] of [
+    ["quickmeds", "QuickMeds Distributors", "warehouse", "Kukatpally depot", 17.4849, 78.4138, demoProof("QuickMeds Distributors", "warehouse", "36", 21)],
+    ["fastpharma", "Fast Pharma Traders", "retailer", "Ameerpet shop", 17.4375, 78.4482, { ...demoProof("Fast Pharma Traders", "retailer", "36", 22), gstin: "36ABCDE1234F1Z9", licenceNo: demoProof("", "retailer", "36", 5).licenceNo }],
+  ] as const) {
+    const k = generateKeyPair();
+    await call("POST", "/register", { handle, name, role, publicKey: k.publicKey, encKey: await encryptSecretKey(k.secretKey, DEMO_PASSPHRASE), site: { name: siteName, lat, lng }, proof });
   }
 
   const ev = (a: Actor, unit: string, type: EventType, ts: number, prev: string, data: Record<string, unknown> = {}): { body: EventBody; sig: string } => {

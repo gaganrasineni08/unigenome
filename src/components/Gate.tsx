@@ -24,6 +24,7 @@ export function Gate({ portal, roles, color, children }: { portal: string; roles
         <Spinner />
       </div>
     );
+  if (me && roles.includes(me.role) && me.status !== "approved") return <Waiting color={color} />;
   if (me && roles.includes(me.role)) return <>{children}</>;
 
   const label = portal[0].toUpperCase() + portal.slice(1);
@@ -101,5 +102,43 @@ export function SignOutButton() {
         Sign out
       </Button>
     </div>
+  );
+}
+
+/** Shown to a new company until the regulator (or, for a quality approver, its manufacturer) has reviewed it. */
+function Waiting({ color }: { color: string }) {
+  const { me, refresh, signOut } = useSession();
+  const rejected = me!.status === "rejected";
+  const revoked = me!.status === "revoked";
+  return (
+    <>
+      <TopBar title={ROLE_LABEL[me!.role]} color={color} />
+      <Page>
+        <div className="mx-auto max-w-lg">
+          <Card>
+            <div className="text-4xl">{rejected || revoked ? "✕" : "⏳"}</div>
+            <h1 className="mt-2 font-display text-2xl font-semibold">
+              {revoked ? "This account has been revoked" : rejected ? "Your registration was not approved" : "Your registration is being reviewed"}
+            </h1>
+            {!rejected && !revoked && (
+              <p className="mt-2 text-mute">
+                {me!.role === "qa"
+                  ? "Your manufacturer must approve you before you can co-sign batches."
+                  : "The regulator checks your licence, GSTIN and documents before your company can join the network. You can't record scans until then."}
+              </p>
+            )}
+            {rejected && (
+              <Alert>
+                Reason: {me!.reviewNote ?? "not given"}. Please register again with the corrected details.
+              </Alert>
+            )}
+            <div className="mt-5 flex gap-2">
+              <Button onClick={() => refresh()}>Check again</Button>
+              <Button variant="soft" onClick={signOut}>Sign out</Button>
+            </div>
+          </Card>
+        </div>
+      </Page>
+    </>
   );
 }
