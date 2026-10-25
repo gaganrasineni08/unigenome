@@ -242,6 +242,8 @@ function phoneTexture() {
 
 // ---------------------------------------------------------------- the model and its moving parts
 
+const NO_SHADOW = new Set(["Skyline", "Skyline_spires", "District_buildings", "District_roofs", "Trees", "LightPools", "Ground"]);
+
 function World({ chapter, truckState }: { chapter: P; truckState: MutableRefObject<{ pos: THREE.Vector3; deg: number }> }) {
   const { scene } = useGLTF(MODEL);
   const parts = useMemo(() => {
@@ -256,15 +258,20 @@ function World({ chapter, truckState }: { chapter: P; truckState: MutableRefObje
       const m = get(n) as THREE.Mesh;
       m.material = new THREE.MeshStandardMaterial({ map: tex, emissiveMap: tex, emissive: new THREE.Color("#ffffff"), emissiveIntensity: 0.35, roughness: 0.7, side: THREE.DoubleSide });
     }
-    // Solid parts cast moon shadows; glowing trim, glass and the far skyline don't need to.
+    // Solid parts cast moon shadows; glowing trim, glass and the city around the ring don't need to.
     scene.traverse((o) => {
       const m = o as THREE.Mesh;
       if (!m.isMesh) return;
       const mat = m.material as THREE.MeshStandardMaterial;
       const glows = !!mat.emissive && mat.emissive.getHex() !== 0 && (mat.emissiveIntensity ?? 0) > 0.5;
-      m.castShadow = !glows && m.name !== "Skyline";
-      m.receiveShadow = true;
+      m.castShadow = !glows && !NO_SHADOW.has(m.name);
+      m.receiveShadow = m.name !== "LightPools";
     });
+    // Pools of lamplight lie on the ground: blend them in without hiding what is drawn after them.
+    const pools = (get("LightPools") as THREE.Mesh).material as THREE.MeshStandardMaterial;
+    pools.depthWrite = false;
+    pools.polygonOffset = true;
+    pools.polygonOffsetFactor = -2;
     const screen = phoneTexture();
     (get("PhoneScreen") as THREE.Mesh).material = new THREE.MeshBasicMaterial({ map: screen, toneMapped: false, side: THREE.DoubleSide });
     return { hauler: get("Hauler"), haloA: get("Halo_a"), haloB: get("Halo_b"), spin: get("Retailer_spin"), beacon: get("Regulator_beacon") as THREE.Mesh };
