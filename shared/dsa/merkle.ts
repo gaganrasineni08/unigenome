@@ -28,6 +28,11 @@ export const merkleRoot = (leafIds: string[]): string => {
 };
 
 export function merkleProof(leafIds: string[], index: number): ProofStep[] {
+  // Without this check an out-of-range index (e.g. indexOf() returning -1) yields a
+  // proof full of undefined hashes instead of an error.
+  if (!Number.isInteger(index) || index < 0 || index >= leafIds.length) {
+    throw new RangeError(`leaf index ${index} out of range for ${leafIds.length} leaves`);
+  }
   const levels = buildLevels(leafIds);
   const proof: ProofStep[] = [];
   let i = index;

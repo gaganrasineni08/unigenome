@@ -61,6 +61,11 @@ describe("merkle", () => {
     }
     expect(merkleProof(Array.from({ length: 48 }, (_, i) => "I-" + i), 3).length).toBe(6);
   });
+  it("rejects a leaf index outside the tree", () => {
+    const ids = ["I-0", "I-1", "I-2"];
+    for (const bad of [-1, 3, 1.5, NaN]) expect(() => merkleProof(ids, bad)).toThrow(RangeError);
+    expect(() => merkleRoot([])).toThrow("empty Merkle tree");
+  });
 });
 
 describe("structures", () => {
