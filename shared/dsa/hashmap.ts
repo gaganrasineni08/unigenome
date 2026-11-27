@@ -37,8 +37,9 @@ export class HashMap<V> {
     return undefined;
   }
 
+  /** True if the key is stored, even when its value is undefined. */
   has(key: string) {
-    return this.get(key) !== undefined;
+    return this.buckets[this.bucketOf(key)].some(([k]) => k === key);
   }
 
   set(key: string, value: V) {
